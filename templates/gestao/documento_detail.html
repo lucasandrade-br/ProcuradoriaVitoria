@@ -1,0 +1,269 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+    
+    
+    <div class="row g-4"> <nav class="col-md-4 col-lg-3">
+            <ul class="nav nav-pills flex-column" id="pje-tab" role="tablist">
+                <h4 class="text-center">Processo: {{ documento.protocolo }}</h4>
+                <a href="javascript:history.back()" class="btn btn-outline-secondary" style="background-color: #212529; color: #ffffff; border-color: #000000;">
+                        &laquo; Voltar
+                </a>
+                <hr>
+                
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active w-100 text-start" id="info-tab" data-bs-toggle="pill" 
+                            data-bs-target="#informacoes" type="button" role="tab">
+                        <i class="fas fa-info-circle fa-fw me-2"></i>1. Informações Gerais
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="docs-tab" data-bs-toggle="pill" 
+                            data-bs-target="#documentos" type="button" role="tab">
+                        <i class="fas fa-folder-open fa-fw me-2"></i>2. Documentos Recebidos
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="anexar-tab" data-bs-toggle="pill" 
+                            data-bs-target="#anexar" type="button" role="tab">
+                        <i class="fas fa-paperclip fa-fw me-2"></i>3. Anexar Parecer
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="devolver-tab" data-bs-toggle="pill" 
+                            data-bs-target="#devolver" type="button" role="tab">
+                        <i class="fas fa-undo fa-fw me-2"></i>4. Devolver à Distribuição
+                    </button>
+                </li>
+            </ul>
+        </nav>
+
+        <main class="col-md-8 col-lg-9">
+            <div class="tab-content" id="pje-tabContent">
+
+
+                <div class="tab-pane fade show active" id="informacoes" role="tabpanel" aria-labelledby="info-tab">
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <h4 class="mb-0">1. Informações Gerais</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-danger text-center">
+                                <strong>DATA LIMITE: {{ documento.data_limite|date:"d/m/Y" }}</strong>
+                            </div>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item"><strong>N° Documento:</strong> {{ documento.num_doc_origem }}</li>
+                                <li class="list-group-item"><strong>Tipo:</strong> {{ documento.tipo_documento }}</li>
+                                <li class="list-group-item"><strong>Atribuído em:</strong> {{ documento.data_atribuicao|date:"d/m/Y" }}</li>
+                                <li class="list-group-item"><strong>Prioridade:</strong> {{ documento.prioridade }}</li>    
+                            
+                                <li class="list-group-item"><strong>Remetente:</strong> {{ documento.remetente }} 
+                                    {% if documento.remetente.email %}(E-mail: {{ documento.remetente.email }}){% endif %}
+                                    {% if documento.remetente.telefone %}(Tel: {{ documento.remetente.telefone }}){% endif %}
+                                </li>
+
+                                <li class="list-group-item"><strong>Protocolado por:</strong> {{ documento.protocolado_por.username }}</li>
+                                <li class="list-group-item"><strong>Observações do Protocolo:</strong>{{ documento.observacoes_protocolo|default:"Nenhuma observação."|linebreaksbr }}</li>
+                            
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="tab-pane fade" id="documentos" role="tabpanel" aria-labelledby="docs-tab"
+                     data-first-pdf-url="{% if anexos_iniciais %}{{ anexos_iniciais.first.arquivo.url }}{% endif %}">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">2. Documentos Recebidos</h4></div>
+                        <div class="card-body">
+                            Selecione um documento para visualizar:
+                            <div class="list-group list-group-flush mb-3">
+                                {% for anexo in anexos_iniciais %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+
+                                            <a href="{{ anexo.arquivo.url }}" 
+                                            class="list-group-item list-group-item-action" 
+                                            onclick="loadPdf('pdf-viewer-procurador', '{{ anexo.arquivo.url }}'); return false;">
+                                                <i class="fas fa-file-pdf me-2"></i>{{ anexo.arquivo.name|cut:"anexos/" }}
+                                            </a>
+                                            <br>
+                                            <small class="text-muted">
+                                                Enviado em: {{ anexo.data_upload|date:"d/m/Y" }}
+                                            </small>
+                                        </div>
+
+                                            {% if documento.status == 'Em Análise' or documento.status == 'Devolvido pela Análise' or documento.status == 'Rejeitado' %}
+                                                {% if user == anexo.usuario_upload %}
+                                                    <form method="POST" action="{% url 'gestao:excluir_anexo' pk=documento.pk anexo_id=anexo.pk %}" 
+                                                          onsubmit="return confirm('Tem certeza que deseja EXCLUIR este anexo?');">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm border-0" title="Excluir Anexo">
+                                                            <i class="fas fa-trash-alt"></i>
+                                                        </button>
+                                                    </form>
+                                                {% endif %}
+                                            {% endif %}
+
+
+                                {% empty %}
+                                    <li class="list-group-item">Nenhum anexo inicial encontrado.</li>
+                                {% endfor %}
+                            </div>
+                            
+                            <iframe id="pdf-viewer-procurador" src="" width="100%" 
+                                    style="height: calc(100vh - 200px);" 
+                                    class="border rounded"></iframe>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+                <div class="tab-pane fade" id="anexar" role="tabpanel" aria-labelledby="anexar-tab"
+                    first-pdf-url="{% if anexos_resposta %}{{ anexos_resposta.first.arquivo.url }}{% endif %}">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">3. Anexar Parecer/Resposta</h4></div>
+                        <div class="card-body">
+                            
+                            {% if anexos_resposta %}
+                                <div class="list-group list-group-flush mb-4">
+                                    {% for anexo in anexos_resposta %}
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <a href="{{ anexo.arquivo.url }}" target="_blank" class="text-decoration-none"
+                                                   onclick="loadPdf('viewer-resposta', '{{ anexo.arquivo.url }}'); return false;">
+                                                    <i class="fas fa-file-pdf me-2 text-danger"></i>{{ anexo.arquivo.name|cut:"anexos/" }}
+                                                </a>
+                                                <br>
+                                                <small class="text-muted">
+                                                    Enviado em: {{ anexo.data_upload|date:"d/m/Y" }}
+                                                </small>
+                                            </div>
+                                            
+                                            {% if documento.status == 'Em Análise' or documento.status == 'Devolvido pela Análise' or documento.status == 'Rejeitado' %}
+                                                <form method="POST" action="{% url 'gestao:excluir_anexo' pk=documento.pk anexo_id=anexo.pk %}" 
+                                                      onsubmit="return confirm('Tem certeza que deseja EXCLUIR este anexo?');">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm border-0" title="Excluir Anexo">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                
+                                <iframe id="viewer-resposta" src="" width="100%" height="500px" class="border rounded mb-4"></iframe>
+
+                                <div class="alert alert-success">
+                                    <h5 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Pronto para concluir?</h5>
+                                    <p class="mb-0">Se você já revisou os arquivos acima e está tudo correto, clique abaixo para finalizar sua análise e enviar o processo ao protocolo.</p>
+                                    <hr>
+                                    <form method="POST">
+                                        {% csrf_token %}
+                                        <button type="submit" name="submit_concluir" value="concluir" class="btn btn-success w-100 fw-bold">
+                                            <i class="fas fa-check-double me-2"></i>CONCLUIR ANÁLISE E ENVIAR
+                                        </button>
+                                    </form>
+                                </div>
+                                <hr class="h2">
+                            {% else %}
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Você precisa anexar pelo menos um parecer antes de poder concluir a análise.
+                                </div>
+                            {% endif %}
+
+                            <h4>Adicionar Novo Anexo:</h4>
+                            <p class="text-muted">Selecione o arquivo do seu computador e clique em "Anexar".</p>
+                            <form method="POST" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                {{ anexo_form.as_p }} 
+                                <button type="submit" name="submit_anexar" value="anexar" class="btn btn-primary mt-2">
+                                    <i class="fas fa-upload me-2"></i>Apenas Anexar (Sem Concluir)
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+
+
+
+                <div class="tab-pane fade" id="devolver" role="tabpanel" aria-labelledby="devolver-tab">
+                    <div class="card shadow-sm border-danger">
+                        <div class="card-header bg-danger text-white"><h4 class="mb-0">4. Devolver à Distribuição</h4></div>
+                        <div class="card-body">
+                            <p class="text-muted">Use esta opção se o documento foi atribuído a você por engano. O documento retornará à fila do protocolador.</p>
+                            <form method="POST" action="{% url 'gestao:devolver_documento' pk=documento.pk %}">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="motivo_devolucao" class="form-label fw-bold">Motivo da Devolução (Obrigatório):</label>
+                                    <textarea id="motivo_devolucao" name="motivo_devolucao" required class="form-control" rows="4"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="fas fa-undo me-2"></i>Confirmar Devolução
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Função para carregar o PDF no iframe
+        // CORREÇÃO 4: A função 'loadPdf' precisa de DOIS argumentos (id do iframe, url)
+        function loadPdf(iframeId, url) { 
+            const iframe = document.getElementById(iframeId);
+            if(iframe) {
+                iframe.src = url; 
+            }
+        }
+        
+        // Adiciona classes Bootstrap aos campos de formulário
+        document.addEventListener('DOMContentLoaded', function() {
+            // Estiliza o formulário de Anexar
+            $('#anexar .form-label').addClass('fw-bold');
+            $('#anexar input[type="file"]').addClass('form-control');
+            
+            // Estiliza o formulário de Devolver
+            $('#devolver textarea').addClass('form-control');
+
+            // --- LÓGICA DE AUTO-LOAD (Atualizada para eventos Bootstrap) ---
+            const docsTabButton = document.getElementById('docs-tab');
+            const docsTabPanel = document.getElementById('documentos');
+
+            if (docsTabButton) {
+                docsTabButton.addEventListener('shown.bs.tab', event => {
+                    const firstPdfUrl = docsTabPanel.getAttribute('data-first-pdf-url');
+                    if (firstPdfUrl) {
+                        const iframe = document.getElementById('pdf-viewer-procurador');
+                        if (iframe && iframe.src !== firstPdfUrl) {
+                            loadPdf('pdf-viewer-procurador', firstPdfUrl);
+                        }
+                    }
+                });
+            }
+            // (Adicione aqui a lógica de auto-load para o painel 'parecer_procurador' se necessário,
+            // copiando a lógica do docsTabButton e adaptando os IDs)
+            const TabButton = document.getElementById('anexar-tab');
+            const TabPanel = document.getElementById('anexar');
+
+            if (TabButton) {
+                TabButton.addEventListener('shown.bs.tab', event => {
+                    const firstPdfUrl = TabPanel.getAttribute('first-pdf-url');
+                    if (firstPdfUrl) {
+                        const iframe = document.getElementById('viewer-resposta');
+                        if (iframe && iframe.src !== firstPdfUrl) {
+                            loadPdf('viewer-resposta', firstPdfUrl);
+                        }
+                    }
+                });
+            }
+            
+        });
+    </script>
+{% endblock %}

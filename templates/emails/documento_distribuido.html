@@ -1,0 +1,69 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Novo Documento para Análise - SGDP{% endblock %}
+
+{% block content %}
+<p class="greeting">Prezado(a) Dr(a). <strong>{{ procurador_nome }}</strong>,</p>
+
+<p>Um novo documento foi distribuído para você no Sistema de Gestão de Documentos (SGDP).</p>
+
+<div class="success-box" style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <strong>✅ Novo documento atribuído a você!</strong>
+</div>
+
+<div class="document-box" style="background-color: #f8f9fa; border-left: 4px solid #04357b; padding: 20px; margin: 20px 0; border-radius: 4px;">
+    <h2 style="margin: 0 0 15px 0; color: #04357b; font-size: 18px;">📄 Detalhes do Documento</h2>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">Protocolo:</span>
+        <span class="info-value" style="color: #333333;">{{ protocolo }}</span>
+    </div>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">N° Documento:</span>
+        <span class="info-value" style="color: #333333;">{{ num_doc_origem }}</span>
+    </div>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">Remetente:</span>
+        <span class="info-value" style="color: #333333;">{{ remetente }}</span>
+    </div>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">Tipo de Documento:</span>
+        <span class="info-value" style="color: #333333;">{{ tipo_documento }}</span>
+    </div>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">Prioridade:</span>
+        <span class="info-value" style="color: #333333;">{{ prioridade }}</span>
+    </div>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">Data Limite:</span>
+        <span class="info-value" style="color: #333333;">{{ data_limite|default:"Não definido" }}</span>
+    </div>
+</div>
+
+{% if observacoes %}
+<div style="background-color: #e7f3ff; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <strong>📝 Observações:</strong><br>
+    {{ observacoes }}
+</div>
+{% endif %}
+
+<p>Os documentos estão anexados a este e-mail e também disponíveis no sistema.</p>
+
+<center>
+    <a href="{{ url_documento }}" class="button" style="display: inline-block; padding: 12px 30px; margin: 20px 0; background-color: #04357b; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">
+        🔍 Acessar Documento no Sistema
+    </a>
+</center>
+
+<div class="divider" style="height: 1px; background-color: #e0e0e0; margin: 20px 0;"></div>
+
+<p style="font-size: 14px; color: #666666;">
+    Atenciosamente,<br>
+    <strong>Equipe SGDP</strong>
+</p>
+{% endblock %}

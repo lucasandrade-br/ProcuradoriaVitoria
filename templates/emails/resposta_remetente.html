@@ -1,0 +1,49 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Resposta ao Documento - SGDP{% endblock %}
+
+{% block content %}
+<p class="greeting">Prezado(a) <strong>{{ remetente_nome }}</strong>,</p>
+
+<p>Informamos que a análise do seu documento foi concluída pela Procuradoria Municipal.</p>
+
+<div class="success-box" style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <strong>✅ Análise Concluída</strong>
+</div>
+
+<div class="document-box" style="background-color: #f8f9fa; border-left: 4px solid #04357b; padding: 20px; margin: 20px 0; border-radius: 4px;">
+    <h2 style="margin: 0 0 15px 0; color: #04357b; font-size: 18px;">📄 Informações do Documento</h2>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">Protocolo:</span>
+        <span class="info-value" style="color: #333333;">{{ protocolo }}</span>
+    </div>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">N° Documento:</span>
+        <span class="info-value" style="color: #333333;">{{ num_doc_origem }}</span>
+    </div>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">Data de Finalização:</span>
+        <span class="info-value" style="color: #333333;">{{ data_finalizacao }}</span>
+    </div>
+</div>
+
+<p>O parecer da Procuradoria está anexado a este e-mail.</p>
+
+{% if observacoes_finalizacao %}
+<div style="background-color: #e7f3ff; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <strong>💬 Observações:</strong><br>
+    {{ observacoes_finalizacao }}
+</div>
+{% endif %}
+
+<div class="divider" style="height: 1px; background-color: #e0e0e0; margin: 20px 0;"></div>
+
+<p style="font-size: 14px; color: #666666;">
+    Atenciosamente,<br>
+    <strong>Procuradoria Municipal</strong><br>
+    Sistema SGDP
+</p>
+{% endblock %}

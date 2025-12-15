@@ -1,0 +1,38 @@
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Django
+*.log
+logs/*.log
+db.sqlite3
+db.sqlite3-journal
+/media
+/static
+
+# Backups
+backups/*.sql
+
+# Ambiente Virtual
+venv/
+env/
+ENV/
+.venv/
+
+# Variáveis de Ambiente (NUNCA COMMITAR!)
+.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db

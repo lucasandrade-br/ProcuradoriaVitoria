@@ -1,0 +1,68 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+    <h1 class="h2">Definir / Alterar PIN de Autorização</h1>
+    <p class="text-muted">Crie ou atualize seu PIN de 4 dígitos. Este PIN será solicitado para confirmar ações críticas, como o envio de e-mails finais.</p>
+    <hr>
+
+    <div class="row">
+        <div class="col-md-8 col-lg-6"> <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">Seu PIN</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    <p class="mb-0">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.novo_pin.id_for_label }}" class="form-label fw-bold">
+                                {{ form.novo_pin.label }}
+                            </label>
+                            <input type="password" name="{{ form.novo_pin.name }}" 
+                                   id="{{ form.novo_pin.id_for_label }}" 
+                                   class="form-control form-control-lg text-center {% if form.novo_pin.errors %}is-invalid{% endif %}"
+                                   maxlength="4" pattern="[0-9]{4}" 
+                                   autocomplete="off" required
+                                   style="font-size: 1.5em; letter-spacing: 0.5em;">
+                            
+                            <div class="form-text">{{ form.novo_pin.help_text }}</div>
+                            {% for error in form.novo_pin.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.confirmar_pin.id_for_label }}" class="form-label fw-bold">
+                                {{ form.confirmar_pin.label }}
+                            </label>
+                            <input type="password" name="{{ form.confirmar_pin.name }}" 
+                                   id="{{ form.confirmar_pin.id_for_label }}" 
+                                   class="form-control form-control-lg text-center {% if form.confirmar_pin.errors %}is-invalid{% endif %}"
+                                   maxlength="4" pattern="[0-9]{4}" 
+                                   autocomplete="off" required
+                                   style="font-size: 1.5em; letter-spacing: 0.5em;">
+                            
+                            {% for error in form.confirmar_pin.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <hr class="my-4">
+                        
+                        <button type="submit" class="btn btn-primary" style="background-color: #04357b; border-color: #04357b;">
+                            <i class="fas fa-save me-2"></i>Salvar PIN
+                        </button>
+                    </form>
+                </div> </div> </div> </div> {% endblock %}

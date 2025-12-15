@@ -1,0 +1,312 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+    
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h2">Análise Final do Processo: {{ documento.protocolo }}</h1>
+        </div>
+        <a href="{% url 'gestao:confirmacao_lista' %}" class="btn btn-outline-secondary" style="background-color: #212529; color: #ffffff; border-color: #000000;">
+            &laquo; Voltar à Lista
+        </a>
+    </div>
+    <hr>
+    
+    <div class="row g-4"> <nav class="col-md-4 col-lg-3">
+            <ul class="nav nav-pills flex-column" id="pje-tab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active w-100 text-start" id="info-tab" data-bs-toggle="pill" 
+                            data-bs-target="#informacoes" type="button" role="tab">
+                        <i class="fas fa-info-circle fa-fw me-2"></i>1. Informações Gerais
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="docs-tab" data-bs-toggle="pill" 
+                            data-bs-target="#documentos_iniciais" type="button" role="tab">
+                        <i class="fas fa-folder-open fa-fw me-2"></i>2. Documento Original
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="parecer-tab" data-bs-toggle="pill" 
+                            data-bs-target="#parecer_procurador" type="button" role="tab">
+                        <i class="fas fa-file-alt fa-fw me-2"></i>3. Visualizar Parecer
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="confirmar-tab" data-bs-toggle="pill" 
+                            data-bs-target="#confirmar_agora" type="button" role="tab">
+                        <i class="fas fa-check-circle fa-fw me-2"></i>4. Confirmar Arquivamento
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start text-danger" id="rejeitar-tab" data-bs-toggle="pill" 
+                            data-bs-target="#rejeitar_processo" type="button" role="tab">
+                        <i class="fas fa-undo fa-fw me-2"></i>5. Rejeitar e Devolver
+                    </button>
+                </li>
+            </ul>
+        </nav>
+
+        <main class="col-md-8 col-lg-9">
+            <div class="tab-content" id="pje-tabContent">
+
+                <div class="tab-pane fade show active" id="informacoes" role="tabpanel" aria-labelledby="info-tab">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">1. Informações Gerais</h4></div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item"><strong>Status:</strong> <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis">{{ documento.status }}</span></li>
+                                <li class="list-group-item"><strong>Remetente:</strong> {{ documento.remetente }} </li>
+                                <li class="list-group-item"><strong>Tipo:</strong> {{ documento.tipo_documento }}</li>
+                                <li class="list-group-item"><strong>Tempo de Análise:</strong> {{ tempo_resposta|default:"-" }} dia(s)</li>
+                                <li class="list-group-item"><strong>Respondido em:</strong> {{ documento.data_resposta_procurador|date:"d/m/Y H:i"|default:"-" }}</li>
+                                <li class="list-group-item"><strong>Prazo:</strong> <span class="fw-bold text-danger">{{ documento.data_limite|date:"d/m/Y"|default:"-" }}</span></li>
+                                <li class="list-group-item">
+                                    <strong>Registro do Protocolador:</strong>
+                                    <p class="text-muted fst-italic bg-light-subtle p-2 rounded">
+                                        "{{ obs_protocolador|default:"Nenhum registro deixado pelo protocolador." }}"
+                                    </p>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="documentos_iniciais" role="tabpanel" aria-labelledby="docs-tab"
+                     data-first-pdf-url="{% if anexos_iniciais %}{{ anexos_iniciais.first.arquivo.url }}{% endif %}">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">2. Documento Original (Recebido)</h4></div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush mb-3">
+                                {% for anexo in anexos_iniciais %}
+                                    <a href="{{ anexo.arquivo.url }}" class="list-group-item list-group-item-action" 
+                                       onclick="loadPdf('viewer-inicial', '{{ anexo.arquivo.url }}'); return false;">
+                                        <i class="fas fa-file-pdf me-2"></i>{{ anexo.arquivo.name|cut:"anexos/" }}
+                                    </a>
+                                {% empty %}
+                                    <li class="list-group-item">Nenhum anexo inicial encontrado.</li>
+                                {% endfor %}
+                            </div>
+                            <iframe id="viewer-inicial" src="" width="100%" style="height: calc(100vh - 280px);" class="border rounded"></iframe>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="parecer_procurador" role="tabpanel" aria-labelledby="parecer-tab"
+                     data-first-pdf-url="{% if anexos_resposta %}{{ anexos_resposta.first.arquivo.url }}{% endif %}">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">3. Visualizar Parecer do Procurador</h4></div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush mb-3">
+                                {% for anexo in anexos_resposta %}
+                                    <a href="{{ anexo.arquivo.url }}" class="list-group-item list-group-item-action" 
+                                       onclick="loadPdf('viewer-resposta', '{{ anexo.arquivo.url }}'); return false;">
+                                        <i class="fas fa-file-pdf me-2"></i>{{ anexo.arquivo.name|cut:"anexos/" }}
+                                        <small class="d-block text-muted"> (Anexado por: {{ anexo.usuario_upload.username }} em {{ anexo.data_upload|date:"d/m/Y" }})</small>
+                                    </a>
+                                {% empty %}
+                                    <li class="list-group-item">Nenhum parecer encontrado.</li>
+                                {% endfor %}
+                            </div>
+                            <iframe id="viewer-resposta" src="" width="100%" style="height: calc(100vh - 280px);" class="border rounded"></iframe>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="tab-pane fade" id="confirmar_agora" role="tabpanel" aria-labelledby="confirmar-tab">
+                    <div class="card shadow-sm border-success">
+                        <div class="card-header bg-success text-white"><h4 class="mb-0">4. Confirmar Arquivamento</h4></div>
+                        <div class="card-body">
+                            <p class="text-muted">Ao confirmar, o processo será movido para "Finalizado" e a resposta será enviada ao remetente (se o e-mail estiver cadastrado).</p>
+                            <form method="POST" action="" id="form-arquivamento">
+                                {% csrf_token %}
+                                <button type="button" id="btn-abrir-modal-pin" class="btn btn-success btn-lg">
+                                    <i class="fas fa-archive me-2"></i>Confirmar e Arquivar Processo
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="tab-pane fade" id="rejeitar_processo" role="tabpanel" aria-labelledby="rejeitar-tab">
+                    <div class="card shadow-sm border-danger">
+                        <div class="card-header bg-danger text-white"><h4 class="mb-0">5. Rejeitar e Devolver para Análise</h4></div>
+                        <div class="card-body">
+                            <p class="text-muted">Esta ação devolverá o processo ao Procurador original para correção.</p>
+                            
+                            <form method="POST" action="{% url 'gestao:rejeitar_confirmacao' pk=documento.pk %}" id="form-rejeicao">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="motivo_rejeicao" class="form-label fw-bold">Motivo da Rejeição (Obrigatório):</label>
+                                    <textarea id="motivo_rejeicao" name="motivo_rejeicao" required class="form-control" rows="5"></textarea>
+                                </div>
+                                
+                                <button type="button" id="btn-abrir-modal-pin-rejeitar" class="btn btn-danger">
+                                    <i class="fas fa-undo me-2"></i>Confirmar Rejeição
+                                </button>
+                            </form>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div> <div class="modal fade" id="pin-modal" tabindex="-1" aria-labelledby="pinModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="pinModalLabel">Ação Requer Confirmação</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p>Para enviar o e-mail final e arquivar, por favor, digite seu PIN de 4 dígitos.</p>
+                    <form id="form-pin" onsubmit="return false;">
+                        <input type="password" id="id_pin_digitado" name="pin_digitado" 
+                               maxlength="4" pattern="[0-9]{4}" 
+                               class="form-control form-control-lg text-center"
+                               style="font-size: 2em; width: 120px; margin: 10px auto;"
+                               autocomplete="off" required>
+                        <br>
+                        <div id="pin-modal-errors" class="text-danger" style="height: 20px; margin-bottom: 10px;"></div>
+                        <button type="button" id="btn-confirmar-pin" class="btn btn-success w-100">
+                            Confirmar PIN e Enviar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Função para carregar o PDF no iframe
+        function loadPdf(iframeId, url) { 
+            const iframe = document.getElementById(iframeId);
+            if(iframe) {
+                iframe.src = url; 
+            }
+        }
+        
+        // Adiciona classes Bootstrap aos campos de formulário
+        document.addEventListener('DOMContentLoaded', function() {
+            // Estiliza o formulário de Rejeição
+            $('#rejeitar_processo textarea').addClass('form-control');
+
+            // --- LÓGICA DE AUTO-LOAD (para os 2 iframes) ---
+            // (Código de auto-load para 'docs-tab' e 'parecer-tab' continua o mesmo)
+            const docsTabButton = document.getElementById('docs-tab');
+            const docsTabPanel = document.getElementById('documentos_iniciais');
+            if (docsTabButton) {
+                docsTabButton.addEventListener('shown.bs.tab', event => {
+                    const firstPdfUrl = docsTabPanel.getAttribute('data-first-pdf-url');
+                    if (firstPdfUrl) {
+                        const iframe = document.getElementById('viewer-inicial');
+                        if (iframe && iframe.src !== firstPdfUrl) {
+                            loadPdf('viewer-inicial', firstPdfUrl);
+                        }
+                    }
+                });
+            }
+            const parecerTabButton = document.getElementById('parecer-tab');
+            const parecerTabPanel = document.getElementById('parecer_procurador');
+            if (parecerTabButton) {
+                parecerTabButton.addEventListener('shown.bs.tab', event => {
+                    const firstPdfUrl = parecerTabPanel.getAttribute('data-first-pdf-url');
+                    if (firstPdfUrl) {
+                        const iframe = document.getElementById('viewer-resposta');
+                        if (iframe && iframe.src !== firstPdfUrl) {
+                            loadPdf('viewer-resposta', firstPdfUrl);
+                        }
+                    }
+                });
+            }
+
+            // --- LÓGICA DO MODAL DE PIN (REFATORADA) ---
+            
+            // Formulários principais
+            const formArquivamento = document.getElementById('form-arquivamento');
+            const formRejeicao = document.getElementById('form-rejeicao');
+            
+            // Botões que ABREM o modal
+            const btnAbrirModalArquivar = document.getElementById('btn-abrir-modal-pin');
+            const btnAbrirModalRejeitar = document.getElementById('btn-abrir-modal-pin-rejeitar');
+            
+            // Elementos do Modal
+            const modalElement = document.getElementById('pin-modal');
+            const pinModal = new bootstrap.Modal(modalElement);
+            const btnConfirmarPin = document.getElementById('btn-confirmar-pin');
+            const pinInput = document.getElementById('id_pin_digitado');
+            const pinErrors = document.getElementById('pin-modal-errors');
+            
+            // Variável para saber qual formulário submeter
+            let formParaSubmeter = null; 
+
+            // 1. Ouvinte para o botão ARQUIVAR
+            if (btnAbrirModalArquivar) {
+                btnAbrirModalArquivar.addEventListener('click', () => {
+                    formParaSubmeter = formArquivamento; // Define o formulário
+                    pinInput.value = '';
+                    pinErrors.textContent = '';
+                    pinModal.show();
+                    modalElement.addEventListener('shown.bs.modal', () => pinInput.focus(), { once: true });
+                });
+            }
+            
+            // 2. Ouvinte para o botão REJEITAR (NOVO)
+            if (btnAbrirModalRejeitar) {
+                btnAbrirModalRejeitar.addEventListener('click', () => {
+                    formParaSubmeter = formRejeicao; // Define o formulário
+                    pinInput.value = '';
+                    pinErrors.textContent = '';
+                    pinModal.show();
+                    modalElement.addEventListener('shown.bs.modal', () => pinInput.focus(), { once: true });
+                });
+            }
+
+            // 3. Confirmar o PIN (Lógica Central REUTILIZADA)
+            btnConfirmarPin.addEventListener('click', () => {
+                if (!formParaSubmeter) return; // Segurança
+
+                const pinDigitado = pinInput.value;
+                pinErrors.textContent = 'Verificando...';
+                // Pega o CSRF do formulário que foi definido (seja arquivar ou rejeitar)
+                const csrfToken = formParaSubmeter.querySelector('input[name="csrfmiddlewaretoken"]').value;
+                
+                const formData = new FormData();
+                formData.append('pin_digitado', pinDigitado);
+                
+                fetch("{% url 'gestao:verificar_pin_ajax' %}", {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // SUCESSO! Submete o formulário correto
+                        pinErrors.textContent = 'PIN Correto. Processando...';
+                        formParaSubmeter.submit(); 
+                    } else {
+                        // FALHA!
+                        pinErrors.textContent = data.error || 'PIN incorreto.';
+                        pinInput.value = '';
+                        pinInput.focus();
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro na requisição AJAX:', error);
+                    pinErrors.textContent = 'Erro de comunicação. Tente novamente.';
+                });
+            });
+            
+            // (PIN com Enter)
+            pinInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    btnConfirmarPin.click();
+                }
+            });
+
+        }); // Fim do DOMContentLoaded
+    </script>
+
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Documento Devolvido para Revisão - SGDP{% endblock %}
+
+{% block content %}
+<p class="greeting">Prezado(a) Dr(a). <strong>{{ procurador_nome }}</strong>,</p>
+
+<p>O documento abaixo foi devolvido e requer uma nova análise de sua parte.</p>
+
+<div class="alert-box" style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <strong>⚠️ Revisão Solicitada</strong>
+</div>
+
+<div class="document-box" style="background-color: #f8f9fa; border-left: 4px solid #04357b; padding: 20px; margin: 20px 0; border-radius: 4px;">
+    <h2 style="margin: 0 0 15px 0; color: #04357b; font-size: 18px;">📄 Detalhes do Documento</h2>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">Protocolo:</span>
+        <span class="info-value" style="color: #333333;">{{ protocolo }}</span>
+    </div>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">N° Documento:</span>
+        <span class="info-value" style="color: #333333;">{{ num_doc_origem }}</span>
+    </div>
+    
+    <div class="info-row" style="margin: 10px 0;">
+        <span class="info-label" style="font-weight: bold; color: #555555;">Remetente:</span>
+        <span class="info-value" style="color: #333333;">{{ remetente }}</span>
+    </div>
+</div>
+
+{% if motivo_devolucao %}
+<div style="background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <strong>📋 Motivo da Devolução:</strong><br>
+    {{ motivo_devolucao }}
+</div>
+{% endif %}
+
+<p>Por favor, revise o documento e realize as correções necessárias.</p>
+
+<center>
+    <a href="{{ url_documento }}" class="button" style="display: inline-block; padding: 12px 30px; margin: 20px 0; background-color: #04357b; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">
+        🔍 Acessar Documento no Sistema
+    </a>
+</center>
+
+<div class="divider" style="height: 1px; background-color: #e0e0e0; margin: 20px 0;"></div>
+
+<p style="font-size: 14px; color: #666666;">
+    Atenciosamente,<br>
+    <strong>Equipe SGDP</strong>
+</p>
+{% endblock %}

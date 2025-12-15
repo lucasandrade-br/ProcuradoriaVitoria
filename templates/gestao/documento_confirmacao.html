@@ -1,0 +1,53 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8"> <div class="card shadow-sm border-success">
+                
+                <div class="card-header bg-success text-white text-center">
+                    <h4 class="mb-0">Documento Protocolado com Sucesso!</h4>
+                </div>
+                
+                <div class="card-body text-center">
+                    <p class="lead mt-3">O número do protocolo gerado para este documento é:</p>
+                    
+                    <h1 class="display-3 fw-bold my-3" style="color: #04357b;">
+                        {{ documento.protocolo }}
+                    </h1>
+                    
+                    <p class="text-muted">Por favor, anote este número ou informe ao remetente.</p>
+                </div>
+
+                <div class="card-body border-top">
+                    <h5 class="card-title">Resumo do Cadastro:</h5>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <strong>Remetente:</strong> {{ documento.remetente }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Tipo:</strong> {{ documento.tipo_documento }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Num. Origem:</strong> {{ documento.num_doc_origem }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Data Origem:</strong> {{ documento.data_doc_origem|date:"d/m/Y" }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Status Inicial:</strong> 
+                            <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill">
+                                {{ documento.status }}
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="card-footer text-center bg-light-subtle">
+                    <a href="{% url 'gestao:documento_create' %}" class="btn" style="background-color: #04357b; color: white;">
+                        <i class="fas fa-plus-circle me-2"></i>Cadastrar Novo Documento
+                    </a> 
+                    <a href="{% url 'gestao:dashboard' %}" class="btn btn-secondary ms-2">
+                        <i class="fas fa-home me-2"></i>Voltar ao Início
+                    </a>
+                </div>
+            </div> </div> </div> {% endblock %}

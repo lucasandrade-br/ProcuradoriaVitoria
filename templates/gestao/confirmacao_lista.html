@@ -1,0 +1,52 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+    <h1>Processos Aguardando Confirmação</h1>
+    <p class="text-muted">Lista de documentos respondidos que aguardam a confirmação final antes do arquivamento.</p>
+    <hr>
+
+    <table class="table table-striped table-hover table-sm align-middle">
+        <thead>
+            <tr class="table-dark">
+                 
+                <th class="text-center">Protocolo</th>
+                <th class="text-center">N Documento</th>
+                <th class="text-center">Prioridade</th> 
+                <th class="text-center">Tipo de Documento</th>
+                <th class="text-center">Procurador (Autor)</th>
+                <th class="text-center">Remetente</th>
+                <th class="text-center">Ações</th>
+                
+            </tr>
+        </thead>
+        <tbody>
+            {% for doc in documentos %}
+            <tr>
+                
+                <td class="text-center">{{ doc.protocolo }}</td>
+                <td class="text-center">{{ doc.num_doc_origem}}</td>
+                <td class="text-center">{{ doc.prioridade }}</td>
+                <td class="text-center">{{ doc.tipo_documento }}</td>
+                <td class="text-start">{{ doc.procurador_atribuido.get_full_name|default:doc.procurador_atribuido.username }}</td>
+                <td class="text-start">{{ doc.remetente }}</td>
+                <td class="text-center"> 
+                    <a href="{% url 'gestao:confirmacao_detail' pk=doc.pk %}" 
+                       class="btn btn-sm" 
+                       style="background-color: #04357b; color: white; --bs-btn-padding-y: .15rem; --bs-btn-padding-x: .4rem; --bs-btn-font-size: .8rem;"
+                       title="Revisar e Confirmar">
+                       <i class="fas fa-edit me-1"></i>Revisar
+                    </a>
+                </td>
+                
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center p-3">
+                    Nenhum documento aguardando confirmação no momento.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+{% endblock %}

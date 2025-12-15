@@ -1,0 +1,3 @@
+# Este diretório contém os logs da aplicação
+# Os arquivos de log são automaticamente rotacionados quando atingem 10MB
+*.log

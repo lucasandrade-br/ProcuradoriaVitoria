@@ -1,0 +1,62 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+    
+            <a href="javascript:history.back()" class="btn btn-outline-secondary" style="background-color: #212529; color: #ffffff; border-color: #000000; margin-bottom: 1rem;">
+                &laquo; Voltar à Lista
+            </a>
+            <h1 class="h2 text-start">Enviar Lembrete</h1>
+            <p class="text-muted">Envio de lembrete sobre o processo mencionado.</p>
+            <hr>
+    
+
+
+    
+        <div class="row">
+            <div class="col-md-10 col-lg-8"> <div class="card shadow-sm">
+                    
+                    <div class="card-header">
+                        <h5 class="mb-0">Detalhes do Lembrete</h5>
+                    </div>
+                    
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <strong>Para (Procurador):</strong> {{ documento.procurador_atribuido.get_full_name|default:documento.procurador_atribuido.username }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>E-mail:</strong> {{ documento.procurador_atribuido.email }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Protocolo:</strong> {{ documento.protocolo }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Número Documento:</strong> {{ documento.num_doc_origem }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Data Limite:</strong> <span class="text-danger fw-bold">{{ documento.data_limite|date:"d/m/Y"|default:"N/A" }}</span>
+                        </li>
+                    </ul>
+
+                    <div class="card-body">
+                        <p class="text-muted small">O(s) anexo(s) original(is) do processo será(ão) incluído(s) automaticamente no e-mail.</p>
+                        
+                        <form method="POST" action=""> {% csrf_token %}
+                            
+                            <div class="mb-3">
+                                <label for="id_custom_message" class="form-label fw-bold">Mensagem Adicional (Opcional):</label>
+                                <textarea name="custom_message" id="id_custom_message" class="form-control" rows="4" placeholder="Digite aqui alguma observação extra para o procurador..."></textarea>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-warning text-dark">
+                                <i class="fas fa-paper-plane me-2"></i>Confirmar Envio do Lembrete
+                            </button>
+                            <a href="{% url 'gestao:monitoramento_analises' %}" class="btn btn-secondary ms-2">
+                                Cancelar
+                            </a>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+{% endblock %}

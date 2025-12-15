@@ -1,0 +1,232 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+    
+   
+
+    <div class="row g-4"> <nav class="col-md-4 col-lg-3">
+            <ul class="nav nav-pills flex-column" id="pje-tab" role="tablist">
+
+                <h5 class="text-center">Processo: {{ documento.protocolo }}</h5>
+                <a href="javascript:history.back()" class="btn btn-outline-secondary" style="background-color: #212529; color: #ffffff; border-color: #000000;">
+                        &laquo; Voltar
+                </a>
+                <hr>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active w-100 text-start" id="info-tab" data-bs-toggle="pill" 
+                            data-bs-target="#informacoes" type="button" role="tab">
+                        <i class="fas fa-info-circle fa-fw me-2"></i>1. Informações Gerais
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="docs-tab" data-bs-toggle="pill" 
+                            data-bs-target="#documentos_iniciais" type="button" role="tab">
+                        <i class="fas fa-folder-open fa-fw me-2"></i>2. Documento Original
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="parecer-tab" data-bs-toggle="pill" 
+                            data-bs-target="#parecer_procurador" type="button" role="tab">
+                        <i class="fas fa-file-alt fa-fw me-2"></i>3. Parecer do Procurador
+                    </button>
+                </li>
+                
+                {% if documento.status == 'Finalizado' and pode_reativar %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link w-100 text-start bg-warning text-dark" id="reativar-tab" data-bs-toggle="pill" 
+                                data-bs-target="#reativar_processo" type="button" role="tab">
+                            <i class="fas fa-history fa-fw me-2"></i>4. Reativar Processo
+                        </button>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+
+        <main class="col-md-8 col-lg-9">
+            <div class="tab-content" id="pje-tabContent">
+
+                <div class="tab-pane fade show active" id="informacoes" role="tabpanel" aria-labelledby="info-tab">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">1. Informações Gerais</h4></div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex">
+                                    <strong>Status:</strong> 
+                                    <span class="badge rounded-pill 
+                                        {% if documento.status == 'Finalizado' %}bg-dark-subtle text-dark-emphasis
+                                        {% elif documento.status == 'Análise Concluída' %}bg-success-subtle text-success-emphasis
+                                        {% elif documento.status == 'Aguardando Confirmação' %}bg-primary-subtle text-primary-emphasis
+                                        {% elif documento.status == 'Em Análise' %}bg-info-subtle text-info-emphasis
+                                        {% elif documento.status == 'Devolvido pela Análise' %}bg-danger-subtle text-danger-emphasis
+                                        {% else %}bg-secondary-subtle text-secondary-emphasis
+                                        {% endif %}">
+                                        {{ documento.status }}
+                                    </span>
+                                </li>
+                                <li class="list-group-item"><strong>N° Documento:</strong> {{ documento.num_doc_origem }}</li>
+                                <li class="list-group-item"><strong>Remetente:</strong> {{ documento.remetente }} 
+                                    {% if documento.remetente.email %}(E-mail: {{ documento.remetente.email }}){% endif %}
+                                    {% if documento.remetente.telefone %}(Tel: {{ documento.remetente.telefone }}){% endif %}
+                                </li>
+                                <li class="list-group-item"><strong>Tipo:</strong> {{ documento.tipo_documento }}</li>
+                                
+                                
+                                <li class="list-group-item"><strong>Protocolado por:</strong> {{ documento.protocolado_por.username|default:"-" }} em {{ documento.data_recebimento|date:"d/m/Y" }}</li>
+                                
+                                {% if documento.procurador_atribuido %}
+                                    <li class="list-group-item"><strong>Analisado por:</strong> {{ documento.procurador_atribuido.get_full_name|default:documento.procurador_atribuido.username|default:"-" }}</li>
+                                {% endif %}
+                                <li class="list-group-item"><strong>Atribuído em:</strong> {{ documento.data_atribuicao|date:"d/m/Y"|default:"-" }}</li>
+                                <li class="list-group-item"><strong>Respondido em:</strong> {{ documento.data_resposta_procurador|date:"d/m/Y H:i"|default:"-" }}</li>
+                                <li class="list-group-item"><strong>Tempo de Análise:</strong> {% if tempo_resposta is not None %}{{ tempo_resposta }} dia(s){% else %}-{% endif %}</li>
+                                <li class="list-group-item"><strong>Prioridade:</strong> {{ documento.prioridade }}</li>
+                                <li class="list-group-item"><strong>Prazo:</strong> <span class="fw-bold {% if documento.data_limite %}text-danger{% endif %}">{{ documento.data_limite|date:"d/m/Y"|default:"-" }}</span></li>
+                                
+                                {% if documento.observacoes_protocolo %}
+                                <li class="list-group-item">
+                                    <strong>Observações do Protocolo:</strong>
+                                    <p class="text-muted fst-italic bg-light-subtle p-2 rounded mt-1 mb-0">"{{ documento.observacoes_protocolo|linebreaksbr }}"</p>
+                                </li>
+                                {% endif %}
+                                
+                                {% if documento.motivo_ultima_devolucao %}
+                                <li class="list-group-item">
+                                    <strong>Motivo da Devolução:</strong>
+                                    <p class="text-danger fst-italic bg-danger-subtle p-2 rounded mt-1 mb-0">"{{ documento.motivo_ultima_devolucao|linebreaksbr }}"</p>
+                                </li>
+                                {% endif %}
+                                {% if documento.motivo_rejeicao_analista %}
+                                <li class="list-group-item">
+                                    <strong>Motivo da Rejeição (Analista):</strong>
+                                    <p class="text-danger fst-italic bg-danger-subtle p-2 rounded mt-1 mb-0">"{{ documento.motivo_rejeicao_analista|linebreaksbr }}"</p>
+                                </li>
+                                {% endif %}
+                                {% if documento.motivo_ultima_reativacao %}
+                                <li class="list-group-item">
+                                    <strong>Motivo da Reativação:</strong>
+                                    <p class="text-warning fst-italic bg-warning-subtle p-2 rounded mt-1 mb-0">"{{ documento.motivo_ultima_reativacao|linebreaksbr }}"</p>
+                                </li>
+                                {% endif %}
+                                {% if documento.status == 'Finalizado' %}
+                                <li class="list-group-item">
+                                    <strong>Finalizado por:</strong> {{ documento.finalizado_por.get_full_name|default:documento.finalizado_por.username|default:"-" }} em {{ documento.data_finalizacao|date:"d/m/Y" }}
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Registro Finalização:</strong>
+                                    <p class="text-muted fst-italic bg-light-subtle p-2 rounded mt-1 mb-0">"{{ documento.obs_finalizacao|default:"-" }}"</p>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="documentos_iniciais" role="tabpanel" aria-labelledby="docs-tab"
+                     data-first-pdf-url="{% if anexos_iniciais %}{{ anexos_iniciais.first.arquivo.url }}{% endif %}">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">2. Documento Original (Recebido)</h4></div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush mb-3">
+                                {% for anexo in anexos_iniciais %}
+                                    <a href="{{ anexo.arquivo.url }}" class="list-group-item list-group-item-action" 
+                                       onclick="loadPdf('viewer-inicial', '{{ anexo.arquivo.url }}'); return false;">
+                                        <i class="fas fa-file-pdf me-2"></i>{{ anexo.arquivo.name|cut:"anexos/" }}
+                                    </a>
+                                {% empty %}
+                                    <li class="list-group-item">Nenhum anexo inicial encontrado.</li>
+                                {% endfor %}
+                            </div>
+                            <iframe id="viewer-inicial" src="" width="100%" style="height: calc(100vh - 200px);" class="border rounded"></iframe>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="parecer_procurador" role="tabpanel" aria-labelledby="parecer-tab"
+                     data-first-pdf-url="{% if anexos_resposta %}{{ anexos_resposta.first.arquivo.url }}{% endif %}">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">3. Visualizar Parecer do Procurador</h4></div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush mb-3">
+                                {% for anexo in anexos_resposta %}
+                                    <a href="{{ anexo.arquivo.url }}" class="list-group-item list-group-item-action" 
+                                       onclick="loadPdf('viewer-resposta', '{{ anexo.arquivo.url }}'); return false;">
+                                        <i class="fas fa-file-pdf me-2"></i>{{ anexo.arquivo.name|cut:"anexos/" }}
+                                        <small class="d-block text-muted"> (Anexado por: {{ anexo.usuario_upload.username }} em {{ anexo.data_upload|date:"d/m/Y" }})</small>
+                                    </a>
+                                {% empty %}
+                                    <li class="list-group-item">Nenhum parecer encontrado.</li>
+                                {% endfor %}
+                            </div>
+                            <iframe id="viewer-resposta" src="" width="100%" style="height: calc(100vh - 200px);" class="border rounded"></iframe>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if documento.status == 'Finalizado' and pode_reativar %}
+                    <div class="tab-pane fade" id="reativar_processo" role="tabpanel" aria-labelledby="reativar-tab">
+                        <div class="card shadow-sm border-warning">
+                            <div class="card-header bg-warning text-dark"><h4 class="mb-0">4. Reativar Processo</h4></div>
+                            <div class="card-body">
+                                <p class="text-muted">Esta ação retornará o documento para a fila de 'Aguardando Distribuição'.</p>
+                                <form method="POST" action="{% url 'gestao:reativar_documento' pk=documento.pk %}" onsubmit="return confirm('Tem certeza que deseja reativar este processo?');">
+                                    {% csrf_token %}
+                                    <div class="mb-3">
+                                        <label for="id_motivo_reativacao" class="form-label fw-bold">Motivo da Reativação (Obrigatório):</label>
+                                        <textarea id="id_motivo_reativacao" name="motivo_reativacao" required class="form-control" rows="5"></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-warning text-dark">
+                                        <i class="fas fa-history me-2"></i>Confirmar Reativação
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+            </div>
+        </main>
+    </div> <script>
+        // Função para carregar o PDF no iframe
+        function loadPdf(iframeId, url) { 
+            const iframe = document.getElementById(iframeId);
+            if(iframe) {
+                iframe.src = url; 
+            }
+        }
+        
+        // Adiciona classes Bootstrap aos campos de formulário
+        document.addEventListener('DOMContentLoaded', function() {
+            // Estiliza o formulário de Reativação
+            $('#reativar_processo textarea').addClass('form-control');
+
+            // --- LÓGICA DE AUTO-LOAD (para os 2 iframes) ---
+            const docsTabButton = document.getElementById('docs-tab');
+            const docsTabPanel = document.getElementById('documentos_iniciais');
+            const parecerTabButton = document.getElementById('parecer-tab');
+            const parecerTabPanel = document.getElementById('parecer_procurador');
+
+            if (docsTabButton) {
+                docsTabButton.addEventListener('shown.bs.tab', event => {
+                    const firstPdfUrl = docsTabPanel.getAttribute('data-first-pdf-url');
+                    if (firstPdfUrl) {
+                        const iframe = document.getElementById('viewer-inicial');
+                        if (iframe && iframe.src !== firstPdfUrl) {
+                            loadPdf('viewer-inicial', firstPdfUrl);
+                        }
+                    }
+                });
+            }
+            if (parecerTabButton) {
+                parecerTabButton.addEventListener('shown.bs.tab', event => {
+                    const firstPdfUrl = parecerTabPanel.getAttribute('data-first-pdf-url');
+                    if (firstPdfUrl) {
+                        const iframe = document.getElementById('viewer-resposta');
+                        if (iframe && iframe.src !== firstPdfUrl) {
+                            loadPdf('viewer-resposta', firstPdfUrl);
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+{% endblock %}

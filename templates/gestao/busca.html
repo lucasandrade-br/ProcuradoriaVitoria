@@ -1,0 +1,178 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h2">Busca e Arquivo de Documentos</h1>
+    </div>
+    <p class="text-muted">Use os filtros abaixo para encontrar qualquer documento no sistema, incluindo processos finalizados e arquivados.</p>
+    <hr>
+
+    <form method="GET" action="" class="card card-body bg-light-subtle mb-4 shadow-sm">
+        <div class="row g-3">
+            <div class="col-md-6 col-lg-3">
+                <label for="{{ filter_form.protocolo.id_for_label }}" class="form-label fw-bold">Protocolo:</label>
+                {{ filter_form.protocolo }}
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <label for="{{ filter_form.remetente.id_for_label }}" class="form-label fw-bold">Remetente:</label>
+                {{ filter_form.remetente }}
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <label for="{{ filter_form.status.id_for_label }}" class="form-label fw-bold">Status:</label>
+                {{ filter_form.status }}
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <label for="{{ filter_form.data_inicio.id_for_label }}" class="form-label fw-bold">Recebido de:</label>
+                {{ filter_form.data_inicio }}
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <label for="{{ filter_form.data_fim.id_for_label }}" class="form-label fw-bold">Recebido até:</label>
+                {{ filter_form.data_fim }}
+            </div>
+            
+            <div class="col-12 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2" style="background-color: #04357b; border-color: #04357b;">
+                    <i class="fas fa-search me-1"></i>Buscar
+                </button>
+                <a href="{% url 'gestao:busca' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-eraser me-1"></i>Limpar Filtros
+                </a>
+            </div>
+        </div>
+    </form>
+    
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h5 class="mb-0">Resultados da Busca</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-striped table-hover table-bordered table-sm align-middle mb-0">
+                <thead>
+                    <tr class="table-dark">
+                        <th class="text-center">
+                            <a href="?ordenar_por=protocolo&ordem={% if ordenar_por_atual == 'protocolo' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
+                                Protocolo
+                                {% if ordenar_por_atual == 'protocolo' %}
+                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="text-center">
+                            <a href="?ordenar_por=num_doc_origem&ordem={% if ordenar_por_atual == 'num_doc_origem' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
+                                Doc
+                                {% if ordenar_por_atual == 'num_doc_origem' %}
+                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="text-center">
+                            <a href="?ordenar_por=status&ordem={% if ordenar_por_atual == 'status' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
+                                Status
+                                {% if ordenar_por_atual == 'status' %}
+                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="text-start">
+                            <a href="?ordenar_por=remetente__nome_razao_social&ordem={% if ordenar_por_atual == 'remetente__nome_razao_social' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
+                                Remetente
+                                {% if ordenar_por_atual == 'remetente__nome_razao_social' %}
+                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="text-center">
+                            <a href="?ordenar_por=data_recebimento&ordem={% if ordenar_por_atual == 'data_recebimento' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
+                                Recebido
+                                {% if ordenar_por_atual == 'data_recebimento' %}
+                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="text-center">
+                            <a href="?ordenar_por=data_finalizacao&ordem={% if ordenar_por_atual == 'data_finalizacao' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
+                                Finalizado
+                                {% if ordenar_por_atual == 'data_finalizacao' %}
+                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in documentos %}
+                    <tr>
+                        <td class="text-center fw-bold">{{ doc.protocolo }}</td>
+                        <td class="text-center">{{ doc.num_doc_origem }}</td>
+                        
+                        <td class="text-center">
+                            {% if doc.status == 'Finalizado' %}
+                                <span class="badge rounded-pill bg-dark-subtle text-dark-emphasis">{{ doc.status }}</span>
+                            {% elif doc.status == 'Análise Concluída' %}
+                                <span class="badge rounded-pill bg-success-subtle text-success-emphasis">{{ doc.status }}</span>
+                            {% elif doc.status == 'Aguardando Confirmação' %}
+                                <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis">{{ doc.status }}</span>
+                            {% elif doc.status == 'Em Análise' %}
+                                <span class="badge rounded-pill bg-info-subtle text-info-emphasis">{{ doc.status }}</span>
+                            {% elif doc.status == 'Devolvido pela Análise' %}
+                                <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis">{{ doc.status }}</span>
+                            {% else %}
+                                <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis">{{ doc.status }}</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-start">{{ doc.remetente }}</td>
+                        <td class="text-center">{{ doc.data_recebimento|date:"d/m/Y" }}</td>
+                        <td class="text-center">{{ doc.data_finalizacao|date:"d/m/Y"|default:"-" }}</td>
+                        
+                        <td class="text-center">
+                            <a href="{% url 'gestao:documento_consulta' pk=doc.pk %}" title="Acessar Processo" 
+                                class="btn btn-sm" 
+                                style="background-color: #04357b; color: white; --bs-btn-padding-y: .15rem; --bs-btn-padding-x: .4rem; --bs-btn-font-size: .8rem;"
+                                title="Ver detalhes e anexos"> 
+                                <i class="fas fa-edit me-1"></i>Revisar
+                            </a>
+                         </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center p-4 text-muted">
+                            {% if request.GET %}
+                                <i class="fas fa-search-minus fa-3x mb-3 d-block"></i>
+                                Nenhum documento encontrado com os filtros aplicados.
+                            {% else %}
+                                <i class="fas fa-search fa-3x mb-3 d-block"></i>
+                                Utilize os filtros acima para iniciar uma pesquisa.
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            $('#{{ filter_form.protocolo.id_for_label }}').addClass('form-control');
+            $('#{{ filter_form.remetente.id_for_label }}').addClass('form-select');
+            $('#{{ filter_form.status.id_for_label }}').addClass('form-select');
+            $('#{{ filter_form.data_inicio.id_for_label }}').addClass('form-control');
+            $('#{{ filter_form.data_fim.id_for_label }}').addClass('form-control');
+        });
+    </script>
+
+{% endblock %}

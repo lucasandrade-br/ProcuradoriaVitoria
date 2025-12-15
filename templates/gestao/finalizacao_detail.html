@@ -1,0 +1,407 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+
+
+    <div class="row g-4"> <nav class="col-md-4 col-lg-3">
+            <ul class="nav nav-pills flex-column" id="pje-tab" role="tablist">
+                <h5 class="text-center">Processo: {{ documento.protocolo }}</h5>
+                <a href="{% url 'gestao:monitoramento_analises' %}" class="btn btn-outline-secondary" style="background-color: #212529; color: #ffffff; border-color: #000000; margin-bottom: 1rem;">
+                    &laquo; Voltar à Lista
+                </a>
+                <hr>
+
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active w-100 text-start" id="info-tab" data-bs-toggle="pill" 
+                            data-bs-target="#informacoes" type="button" role="tab">
+                        <i class="fas fa-info-circle fa-fw me-2"></i>1. Informações Gerais
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="docs-tab" data-bs-toggle="pill" 
+                            data-bs-target="#documentos_iniciais" type="button" role="tab">
+                        <i class="fas fa-folder-open fa-fw me-2"></i>2. Documento Original
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="parecer-tab" data-bs-toggle="pill" 
+                            data-bs-target="#parecer_procurador" type="button" role="tab">
+                        <i class="fas fa-file-alt fa-fw me-2"></i>3. Parecer do Procurador
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="anexar-tab" data-bs-toggle="pill" 
+                            data-bs-target="#anexar_parecer" type="button" role="tab">
+                        <i class="fas fa-upload fa-fw me-2"></i>4. Anexar Parecer Recebido
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start" id="finalizar-tab" data-bs-toggle="pill" 
+                            data-bs-target="#finalizar_agora" type="button" role="tab">
+                        <i class="fas fa-check-circle fa-fw me-2"></i>5. Registrar Finalização
+                    </button>
+                </li>
+            </ul>
+        </nav>
+
+        <main class="col-md-8 col-lg-9">
+            <div class="tab-content" id="pje-tabContent">
+
+                <div class="tab-pane fade show active" id="informacoes" role="tabpanel" aria-labelledby="info-tab">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">1. Informações Gerais</h4></div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                {% if documento.motivo_rejeicao_analista %}
+                                    <div class="alert alert-danger text-center">    
+                                        <strong>Rejeição do analista: {{ documento.motivo_rejeicao_analista |linebreaksbr }}</strong>
+                                    </div>
+                                {% endif %}
+
+
+
+                                <li class="list-group-item"><strong>Status:</strong> <span class="badge rounded-pill 
+                                    {% if documento.status == 'Análise Concluída' %}
+                                        bg-success-subtle text-success-emphasis
+                                    {% elif documento.status == 'Rejeitado' %}
+                                        bg-danger-subtle text-danger-emphasis
+                                    {% else %}
+                                        bg-info-subtle text-info-emphasis
+                                    {% endif %}">
+                                    {{ documento.status }}</span></li>
+                                <li class="list-group-item"><strong>N° Documento:</strong> {{ documento.num_doc_origem }}</li>
+                                <li class="list-group-item"><strong>Tipo:</strong> {{ documento.tipo_documento }}</li>
+                                <li class="list-group-item"><strong>Prioridade:</strong> {{ documento.prioridade }}</li>
+                                <li class="list-group-item"><strong>Remetente:</strong> {{ documento.remetente }} 
+                                    {% if documento.remetente.email %}
+                                        (E-mail: {{ documento.remetente.email }})
+                                    {% else %}
+                                        (E-mail: Não informado)
+                                    {% endif %}
+                                    {% if documento.remetente.telefone %}
+                                        (Tel: {{ documento.remetente.telefone }})
+                                    {% endif %}
+                                </li>
+                                <li class="list-group-item"><strong>Protocolado por:</strong> {{ documento.protocolado_por.username }} em {{ documento.data_recebimento|date:"d/m/Y" }}</li>
+                                {% if documento.procurador_atribuido %}
+                                    <li class="list-group-item"><strong>Analisado por:</strong> {{ documento.procurador_atribuido.get_full_name|default:documento.procurador_atribuido.username }}</li>
+                                    <li class="list-group-item"><strong>Atribuído em:</strong> {{ documento.data_atribuicao|date:"d/m/Y" }}</li>
+                                    <li class="list-group-item"><strong>Respondido em:</strong> {{ documento.data_resposta_procurador|date:"d/m/Y"|default:"-" }}</li>
+                                    <li class="list-group-item"><strong>Prazo:</strong> <span class="fw-bold {% if documento.data_limite %}text-danger{% endif %}">{{ documento.data_limite|date:"d/m/Y"|default:"-" }}</span></li>
+                                {% endif %}
+                                <li class="list-group-item"><strong>Observações do Protocolo:</strong> {{ documento.observacoes_protocolo|default:"Nenhuma observação."|linebreaksbr }}</li>
+                                
+                                {% if documento.motivo_ultima_reativacao %}
+                                <li class="list-group-item">
+                                    <strong>Motivo da Reativação:</strong>
+                                    <p class="text-warning fst-italic bg-warning-subtle p-2 rounded mt-1 mb-0">"{{ documento.motivo_ultima_reativacao|linebreaksbr }}"</p>
+                                </li>
+                                {% endif %}
+
+                                </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="documentos_iniciais" role="tabpanel" aria-labelledby="docs-tab"
+                     data-first-pdf-url="{% if anexos_iniciais %}{{ anexos_iniciais.first.arquivo.url }}{% endif %}">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">2. Documento Original (Recebido)</h4></div>
+                            <div class="card-body">
+                                <div class="list-group list-group-flush mb-3">
+                                    {% for anexo in anexos_iniciais %}
+                                        <a href="{{ anexo.arquivo.url }}" class="list-group-item list-group-item-action" 
+                                            onclick="loadPdf('viewer-inicial', '{{ anexo.arquivo.url }}'); return false;">
+                                            <i class="fas fa-file-pdf me-2"></i>{{ anexo.arquivo.name|cut:"anexos/" }}
+                                        </a>
+                                    {% empty %}
+                                        <li class="list-group-item">Nenhum anexo inicial encontrado.</li>
+                                    {% endfor %}
+                                </div>
+                                <iframe id="viewer-inicial" src="" width="100%" style="height: calc(100vh - 220px);" class="border rounded"></iframe>
+                            </div>
+                    </div>
+                </div>
+
+
+                <div class="tab-pane fade" id="parecer_procurador" role="tabpanel" aria-labelledby="anexar-tab"
+                     data-first-pdf-url="{% if anexos_resposta %}{{ anexos_resposta.first.arquivo.url }}{% endif %}">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">3. Parecer/Resposta</h4></div>
+                        <div class="card-body">
+                            
+                            {% if anexos_resposta %}
+                                
+                                <div class="list-group list-group-flush mb-3">
+                                    {% for anexo in anexos_resposta %}
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <a href="{{ anexo.arquivo.url }}" class="text-decoration-none"
+                                                   onclick="loadPdf('viewer-resposta', '{{ anexo.arquivo.url }}'); return false;">
+                                                    <i class="fas fa-file-pdf me-2 text-danger"></i>{{ anexo.arquivo.name|cut:"anexos/" }}
+                                                </a>
+                                                <br>
+                                                <small class="text-muted">Enviado em: {{ anexo.data_upload|date:"d/m/Y H:i" }}</small>
+                                            </div>
+                                            <form method="POST" action="{% url 'gestao:excluir_anexo' pk=documento.pk anexo_id=anexo.pk %}" 
+                                                  onsubmit="return confirm('Tem certeza que deseja EXCLUIR este anexo?');">
+                                                {% csrf_token %}
+                                                {% if user.is_superuser or 'Protocolador-Chefe' in user.groups.all|join:','  %}
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm border-0" title="Excluir Anexo">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
+                                                {% endif %}
+                                            </form>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <iframe id="viewer-resposta" src="" width="100%" style="height: calc(100vh - 220px);" class="border rounded">></iframe>
+                                
+                            {% else %}
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>Nenhum parecer anexado ainda.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="anexar_parecer" role="tabpanel" aria-labelledby="anexar-tab">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">4. Anexar Parecer Recebido (via E-mail)</h4></div>
+                        <div class="card-body">
+                            <p class="text-muted">Use este formulário para anexar o parecer que o procurador enviou por e-mail.</p>
+                            <form method="POST" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                {{ anexo_form.as_p }} 
+                                <button type="submit" name="submit_anexo" value="anexar" class="btn btn-success">
+                                    <i class="fas fa-upload me-2"></i>Anexar Parecer Recebido
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div class="tab-pane fade" id="finalizar_agora" role="tabpanel" aria-labelledby="finalizar-tab">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">5. Registrar Ação e Próximo Passo</h4></div>
+                        <div class="card-body">
+                            
+                            
+                            <form method="POST" id="form-finalizacao">
+                                {% csrf_token %}
+                                <fieldset>
+                                    
+                                    <div class="mb-3">
+                                        <label for="{{ finalizacao_form.obs_finalizacao.id_for_label }}" class="form-label fw-bold">
+                                            {{ finalizacao_form.obs_finalizacao.label }}
+                                        </label>
+                                        
+                                        <textarea name="{{ finalizacao_form.obs_finalizacao.name }}" 
+                                                id="{{ finalizacao_form.obs_finalizacao.id_for_label }}" 
+                                                class="form-control {% if finalizacao_form.obs_finalizacao.errors %}is-invalid{% endif %}" 
+                                                rows="4" 
+                                                placeholder="Registre a ação final (ex: envio de e-mail) e escolha o próximo passo para este processo...">{{ finalizacao_form.obs_finalizacao.value|default:"" }}</textarea>
+                                        
+                                        {% for error in finalizacao_form.obs_finalizacao.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ error }}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+
+                                    <button type="submit" name="submit_enviar_conclusao" value="concluir" 
+                                            class="btn btn-warning text-dark me-2">
+                                        <i class="fas fa-user-check me-2"></i>Enviar para Conclusão (Analista)
+                                    </button>
+
+                                    {% if pode_arquivar_direto %}
+                                        <button type="button" id="btn-abrir-modal-pin-arquivar" 
+                                                class="btn" style="background-color: #004a99; color: white;">
+                                            <i class="fas fa-archive me-2"></i>Arquivar Diretamente
+                                        </button>
+                                    {% endif %}
+                                </fieldset>
+                                
+                                <input type="hidden" name="acao_finalizacao" id="acao_finalizacao_input">
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+
+
+
+
+            </div>
+        </div>
+
+
+                
+
+            </div>
+        </main>
+    </div> 
+    
+    <div class="modal fade" id="pin-modal" tabindex="-1" aria-labelledby="pinModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="pinModalLabel">Ação Requer Confirmação</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p>Para enviar o e-mail final e arquivar, por favor, digite seu PIN de 4 dígitos.</p>
+                    <form id="form-pin" onsubmit="return false;">
+                        <input type="password" id="id_pin_digitado" name="pin_digitado" 
+                               maxlength="4" pattern="[0-9]{4}" 
+                               class="form-control form-control-lg text-center"
+                               style="font-size: 2em; width: 120px; margin: 10px auto;"
+                               autocomplete="off" required>
+                        <br>
+                        <div id="pin-modal-errors" class="text-danger" style="height: 20px; margin-bottom: 10px;"></div>
+                        <button type="button" id="btn-confirmar-pin" class="btn btn-success w-100">
+                            Confirmar PIN e Enviar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Função para carregar o PDF no iframe
+        function loadPdf(iframeId, url) { 
+            const iframe = document.getElementById(iframeId);
+            if(iframe) {
+                iframe.src = url; 
+            }
+        }
+        
+        // Adiciona classes Bootstrap aos campos de formulário
+        document.addEventListener('DOMContentLoaded', function() {
+            // (Script de estilização dos forms...)
+            $('#parecer_procurador .form-label').addClass('fw-bold');
+            $('#parecer_procurador input[type="file"]').addClass('form-control'); // Isto pode dar erro agora, vamos mover
+            $('#anexar_parecer .form-label').addClass('fw-bold'); // Estiliza o novo painel
+            $('#anexar_parecer input[type="file"]').addClass('form-control'); // Estiliza o novo painel
+            $('#finalizar_agora textarea').addClass('form-control');
+
+            // --- LÓGICA DE AUTO-LOAD (Atualizada para eventos Bootstrap) ---
+            const docsTabButton = document.getElementById('docs-tab');
+            const docsTabPanel = document.getElementById('documentos_iniciais');
+            if (docsTabButton) {
+                docsTabButton.addEventListener('shown.bs.tab', event => {
+                    const firstPdfUrl = docsTabPanel.getAttribute('data-first-pdf-url');
+                    if (firstPdfUrl) {
+                        const iframe = document.getElementById('viewer-inicial');
+                        if (iframe && iframe.src !== firstPdfUrl) {
+                            loadPdf('viewer-inicial', firstPdfUrl);
+                        }
+                    }
+                });
+            }
+
+            const parecerTabButton = document.getElementById('parecer-tab');
+            const parecerTabPanel = document.getElementById('parecer_procurador');
+            if (parecerTabButton) {
+                parecerTabButton.addEventListener('shown.bs.tab', event => {
+                    const firstPdfUrl = parecerTabPanel.getAttribute('data-first-pdf-url');
+                    if (firstPdfUrl) {
+                        const iframe = document.getElementById('viewer-resposta');
+                        if (iframe && iframe.src !== firstPdfUrl) {
+                            loadPdf('viewer-resposta', firstPdfUrl);
+                        }
+                    }
+                });
+            }
+
+            // --- LÓGICA DO MODAL DE PIN ---
+            const formFinalizacao = document.getElementById('form-finalizacao');
+            const btnAbrirModalArquivar = document.getElementById('btn-abrir-modal-pin-arquivar'); // Note o -arquivar
+            const textareaObsFinalizacao = document.querySelector('#finalizar_agora textarea[name="obs_finalizacao"]');
+            const modalElement = document.getElementById('pin-modal');
+            const pinModal = new bootstrap.Modal(modalElement); // Cria a instância do Modal Bootstrap
+            
+            const btnConfirmarPin = document.getElementById('btn-confirmar-pin');
+            const pinInput = document.getElementById('id_pin_digitado');
+            const pinErrors = document.getElementById('pin-modal-errors');
+            const csrfToken = formFinalizacao.querySelector('input[name="csrfmiddlewaretoken"]').value;
+
+            // 1. Abrir o Modal
+            if (btnAbrirModalArquivar) {
+                btnAbrirModalArquivar.addEventListener('click', () => {
+                    
+                    if (textareaObsFinalizacao && textareaObsFinalizacao.value.trim() === '') {
+                        MESSAGES.error('ERRO: Por favor, preencha o "Registro da Ação de Finalização" antes de arquivar.');
+                        textareaObsFinalizacao.focus(); // Foca no campo de texto
+                        return;
+                    }
+
+                    pinInput.value = '';
+                    pinErrors.textContent = '';
+                    pinModal.show();
+                    
+                    // Foco no input QUANDO o modal terminar de aparecer
+                    modalElement.addEventListener('shown.bs.modal', () => {
+                        pinInput.focus();
+                    }, { once: true });
+                });
+            }
+
+            // 3. Confirmar o PIN (AJAX)
+            btnConfirmarPin.addEventListener('click', () => {
+                const pinDigitado = pinInput.value;
+                pinErrors.textContent = 'Verificando...';
+
+                const formData = new FormData();
+                formData.append('pin_digitado', pinDigitado);
+                
+                fetch("{% url 'gestao:verificar_pin_ajax' %}", {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // SUCESSO!
+                        pinErrors.textContent = 'PIN Correto. Enviando...';
+                        
+                        // Adiciona o campo oculto para simular o clique no botão
+                        const submitInput = document.createElement('input');
+                        submitInput.type = 'hidden';
+                        submitInput.name = 'submit_arquivar_direto'; // Nome do botão
+                        submitInput.value = 'arquivar';
+                        formFinalizacao.appendChild(submitInput);
+                        
+                        // Submete o formulário principal
+                        formFinalizacao.submit();
+                    } else {
+                        // FALHA!
+                        pinErrors.textContent = data.error || 'PIN incorreto.';
+                        pinInput.value = '';
+                        pinInput.focus();
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro na requisição AJAX:', error);
+                    pinErrors.textContent = 'Erro de comunicação. Tente novamente.';
+                });
+            });
+            
+            // (PIN com Enter)
+            pinInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    btnConfirmarPin.click();
+                }
+            });
+
+        }); // Fim do DOMContentLoaded
+    </script>
+
+{% endblock %}
+
+                

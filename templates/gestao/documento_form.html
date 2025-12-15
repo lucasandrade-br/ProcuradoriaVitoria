@@ -1,0 +1,338 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+    <h1 class="h2">Cadastrar Novo Documento</h1>
+    <p class="text-muted">Preencha as informações abaixo para criar um novo processo.</p>
+
+    <hr>
+
+    <form method="POST" enctype="multipart/form-data" id="documento-principal-form">
+        {% csrf_token %}
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header card-footer-cinza-escuro">
+                <h5 class="mb-0">Informações do Documento</h5>
+            </div>
+            <div class="card-body card-cinza-claro">
+                <div class="row g-3"> <div class="col-12">
+                        <label for="{{ documento_form.remetente.id_for_label }}" class="form-label fw-bold">1. Remetente</label>
+                        <div class="input-group">
+                            {{ documento_form.remetente }}
+                            <button class="btn btn-outline-secondary" type="button" id="btn-novo-remetente" title="Cadastrar Novo Remetente">
+                                <i class="fas fa-plus"></i> Novo
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="{{ documento_form.tipo_documento.id_for_label }}" class="form-label fw-bold">2. Tipo de Documento</label>
+                        {{ documento_form.tipo_documento }}
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="{{ documento_form.prioridade.id_for_label }}" class="form-label fw-bold">3. Prioridade</label>
+                        {{ documento_form.prioridade }}
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="{{ documento_form.num_doc_origem.id_for_label }}" class="form-label fw-bold">4. N° Documento de Origem</label>
+                        {{ documento_form.num_doc_origem }}
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="{{ documento_form.data_doc_origem.id_for_label }}" class="form-label fw-bold">5. Data do Documento de Origem</label>
+                        {{ documento_form.data_doc_origem }}
+                    </div>
+
+                    <div class="col-12">
+                         <label for="{{ documento_form.observacoes_protocolo.id_for_label }}" class="form-label fw-bold">6. Observações do Protocolo</label>
+                        {{ documento_form.observacoes_protocolo }}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header card-footer-cinza-escuro">
+                <h5 class="mb-0">Anexos Iniciais</h5>
+            </div>
+            <div class="card-body card-cinza-claro">
+                {{ anexo_formset.management_form }}
+                
+                <!-- Área de upload dinâmico -->
+                <div id="anexos-container" class="mb-3">
+                    <!-- Os campos do formset serão inseridos aqui via JavaScript -->
+                </div>
+                
+                <!-- Lista visual dos anexos selecionados -->
+                <div id="lista-anexos" class="mb-3">
+                    <!-- Cards dos anexos aparecerão aqui -->
+                </div>
+                
+
+                
+                <!-- Botão para adicionar novo anexo -->
+                <button type="button" class="btn btn-outline-primary" id="btn-adicionar-anexo">
+                    <i class="fas fa-paperclip"></i> Adicionar Anexo
+                </button>
+                <small class="form-text text-muted d-block mt-2">
+                    <strong>Formatos aceitos:</strong> Imagens (JPG, PNG, GIF, BMP, WebP) e PDF | 
+                    <strong>Tamanho máximo:</strong> 10 MB por arquivo
+                </small>
+                
+            </div>
+        </div>
+
+        <div class="text-end"> 
+            <button type="submit" class="btn btn-lg" style="background-color: #04357b; color: white;">
+                <i class="fas fa-save me-2"></i> Salvar e Protocolar
+            </button>
+        </div>
+    </form>
+
+    <div class="modal fade" id="modal-remetente" tabindex="-1" aria-labelledby="modalRemetenteLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg"> <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalRemetenteLabel">Cadastrar Novo Remetente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                
+                <form id="form-novo-remetente">
+                    <div class="modal-body">
+                        {% csrf_token %}
+                        <div id="modal-errors" class="alert alert-danger" style="display: none;"></div>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="id_tipo_remetente_modal" class="form-label">Tipo:</label>
+                                <select name="tipo_remetente" required id="id_tipo_remetente_modal" class="form-select">
+                                    <option value="" selected="">---------</option>
+                                    <option value="Pessoa Física">Pessoa Física</option>
+                                    <option value="Pessoa Jurídica">Pessoa Jurídica</option>
+                                    <option value="Órgão Público">Órgão Público</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_cpf_cnpj_modal" class="form-label">CPF / CNPJ:</label>
+                                <input type="text" name="cpf_cnpj" maxlength="18" required id="id_cpf_cnpj_modal" class="form-control">
+                            </div>
+                             <div class="col-12">
+                                <label for="id_nome_razao_social_modal" class="form-label">Nome / Razão Social:</label>
+                                <input type="text" name="nome_razao_social" maxlength="255" required id="id_nome_razao_social_modal" class="form-control">
+                            </div>
+                             <div class="col-md-6">
+                                <label for="id_email_modal" class="form-label">E-mail:</label>
+                                <input type="email" name="email" maxlength="255" id="id_email_modal" class="form-control">
+                            </div>
+                             <div class="col-md-6">
+                                <label for="id_telefone_modal" class="form-label">Telefone:</label>
+                                <input type="text" name="telefone" maxlength="20" id="id_telefone_modal" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" style="background-color: #04357b; border-color: #04357b;">Salvar Remetente</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Executa TUDO apenas quando o DOM estiver 100% carregado
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // --- 1. SCRIPT DE ESTILIZAÇÃO (Adiciona classes do Bootstrap) ---
+            $('#{{ documento_form.tipo_documento.id_for_label }}').addClass('form-select');
+            $('#{{ documento_form.prioridade.id_for_label }}').addClass('form-select');
+            $('#{{ documento_form.num_doc_origem.id_for_label }}').addClass('form-control');
+            $('#{{ documento_form.data_doc_origem.id_for_label }}').addClass('form-control');
+            $('#{{ documento_form.observacoes_protocolo.id_for_label }}').addClass('form-control');
+            $('#{{ documento_form.remetente.id_for_label }}').addClass('form-select');
+            
+            // --- 1.5 SCRIPT DE ANEXOS DINÂMICOS ---
+            let formsetIndex = 0;
+            const anexosContainer = document.getElementById('anexos-container');
+            const listaAnexos = document.getElementById('lista-anexos');
+            const btnAdicionarAnexo = document.getElementById('btn-adicionar-anexo');
+            const totalFormsInput = document.querySelector('#id_anexos-TOTAL_FORMS');
+            
+            // Função para criar um novo campo de upload
+            function criarCampoAnexo() {
+                const div = document.createElement('div');
+                div.className = 'anexo-formset-item';
+                div.style.display = 'none'; // Esconde o campo real
+                div.innerHTML = `
+                    <input type="file" 
+                           name="anexos-${formsetIndex}-arquivo" 
+                           id="id_anexos-${formsetIndex}-arquivo"
+                           accept="image/*,application/pdf"
+                           class="form-control">
+                    <input type="hidden" name="anexos-${formsetIndex}-id" id="id_anexos-${formsetIndex}-id">
+                `;
+                
+                const fileInput = div.querySelector('input[type="file"]');
+                fileInput.addEventListener('change', function(e) {
+                    if (this.files.length > 0) {
+                        const file = this.files[0];
+                        
+                        // Validação cliente-side
+                        const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp', 'application/pdf'];
+                        if (!tiposPermitidos.includes(file.type)) {
+                            alert('Tipo de arquivo não permitido! Use apenas imagens ou PDF.');
+                            this.value = '';
+                            return;
+                        }
+                        
+                        if (file.size > 10 * 1024 * 1024) {
+                            alert('Arquivo muito grande! Tamanho máximo: 10 MB.');
+                            this.value = '';
+                            return;
+                        }
+                        
+                        adicionarAnexoLista(file, formsetIndex);
+                        formsetIndex++;
+                        totalFormsInput.value = formsetIndex;
+                    }
+                });
+                
+                anexosContainer.appendChild(div);
+                return fileInput;
+            }
+            
+            // Função para adicionar anexo na lista visual
+            function adicionarAnexoLista(file, index) {
+                const card = document.createElement('div');
+                card.className = 'alert alert-light border d-flex align-items-center justify-content-between mb-2';
+                card.dataset.index = index;
+                
+                const fileSize = (file.size / 1024).toFixed(1); // KB
+                const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2); // MB
+                const displaySize = file.size > 1024 * 1024 ? `${fileSizeMB} MB` : `${fileSize} KB`;
+                
+                let icone = '📄';
+                if (file.type.startsWith('image/')) {
+                    icone = '📷';
+                } else if (file.type === 'application/pdf') {
+                    icone = '📑';
+                }
+                
+                card.innerHTML = `
+                    <div>
+                        <span class="fs-4 me-2">${icone}</span>
+                        <strong>${file.name}</strong> 
+                        <span class="text-muted">(${displaySize})</span>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerAnexo(${index})">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                `;
+                
+                listaAnexos.appendChild(card);
+            }
+            
+            // Função para remover anexo
+            window.removerAnexo = function(index) {
+                // Remove da lista visual
+                const card = listaAnexos.querySelector(`[data-index="${index}"]`);
+                if (card) card.remove();
+                
+                // Remove o campo de input
+                const formsetItem = anexosContainer.children[index];
+                if (formsetItem) {
+                    formsetItem.remove();
+                }
+            };
+            
+            // Evento do botão adicionar
+            btnAdicionarAnexo.addEventListener('click', function() {
+                const novoInput = criarCampoAnexo();
+                novoInput.click(); // Abre o seletor de arquivos automaticamente
+            });
+            
+            // Inicializa com um campo
+            criarCampoAnexo();
+
+            
+            // --- 2. SCRIPT DO SELECT2 (Busca AJAX) ---
+            $('#{{ documento_form.remetente.id_for_label }}').select2({
+                placeholder: "Digite o Nome ou CPF/CNPJ para buscar...",
+                allowClear: true,
+                minimumInputLength: 2,
+                ajax: {
+                    url: "{% url 'gestao:remetente_autocomplete' %}",
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) { return { term: params.term }; },
+                    processResults: function (data) { return { results: data.results }; },
+                    cache: true
+                },
+                theme: "bootstrap-5",
+                
+            });
+
+            
+            // --- 3. SCRIPT DO MODAL DE REMETENTE ---
+            const modalElement = document.getElementById('modal-remetente');
+            // Verifica se o modal existe antes de criar a instância
+            if (modalElement) {
+                const remetenteModal = new bootstrap.Modal(modalElement);
+                
+                const btnNovoRemetente = document.getElementById('btn-novo-remetente');
+                const formNovoRemetente = document.getElementById('form-novo-remetente');
+                const selectRemetentePrincipal = document.querySelector('#{{ documento_form.remetente.id_for_label }}');
+                const modalErrorsDiv = document.getElementById('modal-errors');
+                const csrfTokenModal = formNovoRemetente.querySelector('input[name="csrfmiddlewaretoken"]').value;
+
+                // 1. Abrir Modal (Agora 'btnNovoRemetente' não será nulo)
+                btnNovoRemetente.addEventListener('click', () => {
+                    modalErrorsDiv.style.display = 'none';
+                    formNovoRemetente.reset();      
+                    remetenteModal.show();
+                });
+
+                // 2. Enviar Formulário do Modal (AJAX/Fetch)
+                formNovoRemetente.addEventListener('submit', (event) => {
+                    event.preventDefault(); 
+                    modalErrorsDiv.textContent = 'Salvando...';
+                    modalErrorsDiv.style.display = 'block';
+
+                    const formData = new FormData(formNovoRemetente);
+                    
+                    fetch("{% url 'gestao:cadastrar_remetente_ajax' %}", {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrfTokenModal },
+                        body: formData 
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // SUCESSO
+                            const newOption = new Option(data.nome, data.id, true, true);
+                            selectRemetentePrincipal.appendChild(newOption);
+                            $(selectRemetentePrincipal).trigger('change');
+                            remetenteModal.hide();
+                        } else {
+                            // ERRO
+                            let errorMsg = 'Erro ao salvar: ';
+                            if (data.errors) {
+                                for (const field in data.errors) {
+                                    errorMsg += `${field}: ${data.errors[field].join(', ')} `;
+                                }
+                            } else {
+                                errorMsg += data.error || 'Verifique o CPF/CNPJ (pode já existir).';
+                            }
+                            modalErrorsDiv.textContent = errorMsg;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro na requisição AJAX:', error);
+                        modalErrorsDiv.textContent = 'Erro de comunicação com o servidor.';
+                    });
+                });
+            } // Fim do if (modalElement)
+
+        }); // Fim do 'DOMContentLoaded'
+    </script>
+{% endblock %}

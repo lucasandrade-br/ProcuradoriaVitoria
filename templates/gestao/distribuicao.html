@@ -1,0 +1,106 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+    
+    <h1 class="h2">Aguardando Distribuição</h1>
+    <p class="text-muted">Lista de todos os documentos que precisam ser atribuídos a um procurador.</p>
+    <hr>
+
+    <form method="POST" action="">
+        {% csrf_token %} 
+
+        <div class="card card-body bg-light-subtle mb-3">
+        
+            {% if procurador_recomendado %}
+                <p class="fw-bold me-3" style="color: #002752;">
+                    <i class="fas fa-star me-1"></i> Sugestão: Atribuir para {{ procurador_recomendado.get_full_name|default:procurador_recomendado.username }}
+                </p>
+            {% endif %}
+
+            <div class="d-flex flex-wrap align-items-center">
+
+                <label for="procurador_id" class="fw-bold me-2">Atribuir selecionados para:</label>
+                
+                <select name="procurador_id" id="procurador_id" class="form-select form-select-sm w-auto me-2" required>
+                    <option value="">--- Selecione um Procurador ---</option>
+                    {% for procurador in procuradores %}
+                        <option value="{{ procurador.id }}">
+                            {{ procurador.get_full_name|default:procurador.username }}
+                        </option>
+                    {% endfor %}
+                </select>
+                
+                <button type="submit" class="btn btn-primary btn-sm" style="background-color: #04357b; border-color: #04357b;">Atribuir</button>
+            </div>
+    
+        </div>
+        
+
+
+        <table class="table table-striped table-hover table-sm align-middle">
+            <thead>
+                <tr class="table-dark">
+                    <th class="text-center">X</th>
+                    
+                    <th class="text-center">Recebido em</th>
+                    <th class="text-center">N° Documento</th>
+                    <th class="text-center">Protocolo</th>
+                    <th class="text-center">Tipo</th>
+                    <th class="text-center">Prioridade</th>
+                    <th class="text-center">Status</th>          
+                    <th class="text-center">Remetente</th> 
+                    <th class="text-center">Ver</th> 
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documentos %}
+                <tr class="documento-row" id="doc-row-{{ doc.pk }}">
+                    <td class="text-center">
+                        <input type="checkbox" name="documento_selecionado" value="{{ doc.id }}" class="form-check-input">
+                    </td>
+                    
+                    <td class="text-center">{{ doc.data_recebimento|date:"d/m/Y"|default:"-" }}</td>
+                    <td class="text-center">{{ doc.num_doc_origem }}</td>
+                    <td class="text-center">{{ doc.protocolo }}</td>
+                    <td class="text-center">{{ doc.tipo_documento }}</td>
+                    <td class="text-center">{{ doc.prioridade }}</td>
+                    <td class="text-center">
+                        {% if doc.status == 'Devolvido pela Análise' %}
+                            <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis d-block mb-1">Devolvido!</span>
+                            {% if doc.motivo_ultima_devolucao %}
+                                <small class="d-block text-muted" title="Motivo: {{ doc.motivo_ultima_devolucao }}">
+                                    Motivo: {{ doc.motivo_ultima_devolucao|truncatechars:20 }}
+                                </small>
+                            {% endif %}
+
+                        {% elif doc.motivo_ultima_reativacao %}
+                            <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis d-block mb-1">Reativado!</span>
+                            
+                        {% else %}
+                             <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis">
+                                {{ doc.status }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="text-start">{{ doc.remetente }}</td>
+
+                    <td class="text-center">
+                        <a href="{% url 'gestao:documento_consulta' pk=doc.pk %}" 
+                            class="btn btn-sm" 
+                            style="background-color: #04357b; color: white; --bs-btn-padding-y: .15rem; --bs-btn-padding-x: .4rem; --bs-btn-font-size: .8rem;"
+                            title="Ver detalhes e anexos"> 
+                            <i class="fas fa-edit me-1"></i>Revisar
+                        </a> 
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center p-3"> Nenhum documento aguardando distribuição no momento.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </form>
+
+    {% endblock %}

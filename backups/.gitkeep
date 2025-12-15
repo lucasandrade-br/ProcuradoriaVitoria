@@ -1,0 +1,3 @@
+# Diretório de backups do banco de dados
+# Os backups são automaticamente mantidos por 30 dias
+*.sql
