@@ -13,14 +13,21 @@
                 <label for="{{ filter_form.protocolo.id_for_label }}" class="form-label fw-bold">Protocolo:</label>
                 {{ filter_form.protocolo }}
             </div>
+
             <div class="col-md-6 col-lg-3">
-                <label for="{{ filter_form.remetente.id_for_label }}" class="form-label fw-bold">Remetente:</label>
-                {{ filter_form.remetente }}
+                <label for="{{ filter_form.tipo_documento.id_for_label }}" class="form-label fw-bold">Tipo de Documento:</label>
+                {{ filter_form.tipo_documento }}
             </div>
+
+            <div class="col-md-6 col-lg-3">
+                <label for="{{ filter_form.interessados.id_for_label }}" class="form-label fw-bold">Interessados:</label>
+                {{ filter_form.interessados }} </div>
+
             <div class="col-md-6 col-lg-3">
                 <label for="{{ filter_form.status.id_for_label }}" class="form-label fw-bold">Status:</label>
                 {{ filter_form.status }}
             </div>
+            
             <div class="col-md-6 col-lg-3">
                 <label for="{{ filter_form.data_inicio.id_for_label }}" class="form-label fw-bold">Recebido de:</label>
                 {{ filter_form.data_inicio }}
@@ -50,63 +57,33 @@
                 <thead>
                     <tr class="table-dark">
                         <th class="text-center">
-                            <a href="?ordenar_por=protocolo&ordem={% if ordenar_por_atual == 'protocolo' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
-                                Protocolo
-                                {% if ordenar_por_atual == 'protocolo' %}
-                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
-                                {% endif %}
+                            <a href="?ordenar_por=protocolo&ordem={% if ordenar_por_atual == 'protocolo' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}&{{ url_params }}" class="text-white text-decoration-none d-block">
+                                Protocolo {% if ordenar_por_atual == 'protocolo' %}<i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>{% else %}<i class="fas fa-sort ms-1 text-muted opacity-50"></i>{% endif %}
                             </a>
                         </th>
                         <th class="text-center">
-                            <a href="?ordenar_por=num_doc_origem&ordem={% if ordenar_por_atual == 'num_doc_origem' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
-                                Doc
-                                {% if ordenar_por_atual == 'num_doc_origem' %}
-                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
-                                {% endif %}
+                            <a href="?ordenar_por=num_doc_origem&ordem={% if ordenar_por_atual == 'num_doc_origem' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}&{{ url_params }}" class="text-white text-decoration-none d-block">
+                                Doc {% if ordenar_por_atual == 'num_doc_origem' %}<i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>{% else %}<i class="fas fa-sort ms-1 text-muted opacity-50"></i>{% endif %}
                             </a>
                         </th>
                         <th class="text-center">
-                            <a href="?ordenar_por=status&ordem={% if ordenar_por_atual == 'status' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
-                                Status
-                                {% if ordenar_por_atual == 'status' %}
-                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
-                                {% endif %}
+                            <a href="?ordenar_por=status&ordem={% if ordenar_por_atual == 'status' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}&{{ url_params }}" class="text-white text-decoration-none d-block">
+                                Status {% if ordenar_por_atual == 'status' %}<i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>{% else %}<i class="fas fa-sort ms-1 text-muted opacity-50"></i>{% endif %}
                             </a>
                         </th>
-                        <th class="text-start">
-                            <a href="?ordenar_por=remetente__nome_razao_social&ordem={% if ordenar_por_atual == 'remetente__nome_razao_social' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
-                                Remetente
-                                {% if ordenar_por_atual == 'remetente__nome_razao_social' %}
-                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
-                                {% endif %}
+                        <th class="text-center">Tipo</th>
+                        <th class="text-start" style="min-width: 200px;">
+                            <span class="text-white d-block text-center">Interessados</span>
+                        </th>
+
+                        <th class="text-center">
+                            <a href="?ordenar_por=data_recebimento&ordem={% if ordenar_por_atual == 'data_recebimento' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}&{{ url_params }}" class="text-white text-decoration-none d-block">
+                                Recebido {% if ordenar_por_atual == 'data_recebimento' %}<i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>{% else %}<i class="fas fa-sort ms-1 text-muted opacity-50"></i>{% endif %}
                             </a>
                         </th>
                         <th class="text-center">
-                            <a href="?ordenar_por=data_recebimento&ordem={% if ordenar_por_atual == 'data_recebimento' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
-                                Recebido
-                                {% if ordenar_por_atual == 'data_recebimento' %}
-                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
-                                {% endif %}
-                            </a>
-                        </th>
-                        <th class="text-center">
-                            <a href="?ordenar_por=data_finalizacao&ordem={% if ordenar_por_atual == 'data_finalizacao' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}" class="text-white text-decoration-none d-block">
-                                Finalizado
-                                {% if ordenar_por_atual == 'data_finalizacao' %}
-                                    <i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ms-1 text-muted opacity-50"></i>
-                                {% endif %}
+                            <a href="?ordenar_por=data_finalizacao&ordem={% if ordenar_por_atual == 'data_finalizacao' and ordem_atual == 'asc' %}desc{% else %}asc{% endif %}&{{ url_params }}" class="text-white text-decoration-none d-block">
+                                Finalizado {% if ordenar_por_atual == 'data_finalizacao' %}<i class="fas fa-sort-{% if ordem_atual == 'asc' %}up{% else %}down{% endif %} ms-1"></i>{% else %}<i class="fas fa-sort ms-1 text-muted opacity-50"></i>{% endif %}
                             </a>
                         </th>
                         <th class="text-center">Ações</th>
@@ -133,45 +110,112 @@
                                 <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis">{{ doc.status }}</span>
                             {% endif %}
                         </td>
+                        <td class="text-center">{{ doc.tipo_documento }}</td>
+                        <td class="text-start">
+                            <div class="d-flex flex-wrap gap-1 justify-content-center">
+                                {% for interessado in doc.interessados.all %}
+                                    <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle px-2 py-1" 
+                                        style="font-size: 0.7rem;" 
+                                        title="{{ interessado.nome_razao_social }}">
+                                        <i class="fas fa-university me-1"></i>{{ interessado.nome_razao_social|truncatechars:18 }}
+                                    </span>
+                                {% empty %}
+                                    <span class="text-muted small">Sem interessados</span>
+                                {% endfor %}
+                            </div>
+                        </td>
 
-                        <td class="text-start">{{ doc.remetente }}</td>
                         <td class="text-center">{{ doc.data_recebimento|date:"d/m/Y" }}</td>
                         <td class="text-center">{{ doc.data_finalizacao|date:"d/m/Y"|default:"-" }}</td>
                         
                         <td class="text-center">
-                            <a href="{% url 'gestao:documento_consulta' pk=doc.pk %}" title="Acessar Processo" 
-                                class="btn btn-sm" 
-                                style="background-color: #04357b; color: white; --bs-btn-padding-y: .15rem; --bs-btn-padding-x: .4rem; --bs-btn-font-size: .8rem;"
+                            <div class="d-flex justify-content-center gap-1">
+                                <a href="{% url 'gestao:documento_consulta' pk=doc.pk %}?origem=busca" 
+                                class="btn btn-sm text-white" 
+                                style="background-color: #04357b; --bs-btn-padding-y: .15rem; --bs-btn-padding-x: .5rem;"
                                 title="Ver detalhes e anexos"> 
-                                <i class="fas fa-edit me-1"></i>Revisar
-                            </a>
-                         </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center p-4 text-muted">
-                            {% if request.GET %}
-                                <i class="fas fa-search-minus fa-3x mb-3 d-block"></i>
-                                Nenhum documento encontrado com os filtros aplicados.
-                            {% else %}
-                                <i class="fas fa-search fa-3x mb-3 d-block"></i>
-                                Utilize os filtros acima para iniciar uma pesquisa.
-                            {% endif %}
+                                    <i class="fas fa-search"></i>
+                                </a>
+                            </div>
                         </td>
                     </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center p-4 text-muted">
+                                Nenhum documento encontrado com os filtros aplicados.
+                            </td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            
+        </div>
+        
+    </div>
+
+    <div class="card-footer bg-white py-3">
+        <div class="d-flex flex-column align-items-center">
+            
+            <div class="text-muted small mb-3">
+                Exibindo <b>{{ documentos.start_index }}-{{ documentos.end_index }}</b> de <b>{{ documentos.paginator.count }}</b> processos encontrados
+            </div>
+
+            <nav aria-label="Navegação de página">
+                <ul class="pagination pagination-sm mb-0">
+                    {% if documentos.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link border-0" href="?page=1&{{ url_params }}" title="Primeira">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link border-0" href="?page={{ documentos.previous_page_number }}&{{ url_params }}">
+                                <i class="fas fa-chevron-left me-1"></i> Anterior
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active mx-1">
+                        <span class="page-link rounded-3 shadow-sm px-3">
+                            {{ documentos.number }}
+                        </span>
+                    </li>
+
+                    {% if documentos.has_next %}
+                        <li class="page-item">
+                            <a class="page-link border-0" href="?page={{ documentos.next_page_number }}&{{ url_params }}">
+                                Próxima <i class="fas fa-chevron-right ms-1"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link border-0" href="?page={{ documentos.paginator.num_pages }}&{{ url_params }}" title="Última">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Estiliza campos de texto/data
             $('#{{ filter_form.protocolo.id_for_label }}').addClass('form-control');
-            $('#{{ filter_form.remetente.id_for_label }}').addClass('form-select');
-            $('#{{ filter_form.status.id_for_label }}').addClass('form-select');
             $('#{{ filter_form.data_inicio.id_for_label }}').addClass('form-control');
             $('#{{ filter_form.data_fim.id_for_label }}').addClass('form-control');
+            
+            // Estiliza selects do Bootstrap
+            $('#{{ filter_form.status.id_for_label }}').addClass('form-select');
+            $('#{{ filter_form.tipo_documento.id_for_label }}').addClass('form-select');
+            
+            // Estiliza o Select2 dos Interessados
+            $('#{{ filter_form.interessados.id_for_label }}').addClass('form-select select2');
+            
+            $('.select2').select2({
+                theme: 'bootstrap-5',
+                width: '100%'
+            });
         });
     </script>
 

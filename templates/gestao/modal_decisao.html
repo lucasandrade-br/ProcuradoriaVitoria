@@ -1,0 +1,243 @@
+<div class="modal fade text-start" id="modalDiligencia{{ diligencia.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-centered">
+                    <div class="modal-content border-0 shadow-lg">
+                        
+                        <div class="modal-header bg-white border-bottom px-4 py-3">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-shape bg-dark text-white rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                    <i class="fas fa-gavel"></i>
+                                </div>
+                                <div>
+                                    <h5 class="modal-title fw-bold text-dark mb-0">Gestão de Diligência</h5>
+                                    <small class="text-muted">Protocolo: <strong>{{ diligencia.documento.protocolo }}</strong></small>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+
+                        <div class="modal-body p-0">
+                            <div class="row g-0">
+                                <div class="col-md-4 border-end bg-light-subtle p-4">
+                                    <label class="small text-uppercase fw-bold mb-2" style="color: #04357b">Solicitação do Procurador:</label>
+                                    <div class="p-3 bg-white border rounded shadow-sm mb-4" 
+                                        style="min-height: 100px; max-height: 400px; overflow-y: auto;">
+                                        <p class="mb-0 text-dark" 
+                                        style="font-size: 0.95rem; white-space: pre-wrap; overflow-wrap: break-word; font-style: italic;"><i class="fas fa-quote-left text-secondary me-2"></i>{{ diligencia.descricao_necessidade }}</p>
+                                    </div>
+
+                                    <div class="small">
+                                        <p class="mb-1 text-muted"><strong>Procurador:</strong> {{ diligencia.procurador.get_full_name }}</p>
+                                        <p class="mb-1 text-muted"><strong>Data:</strong> {{ diligencia.data_solicitacao|date:"d/m/Y H:i" }}</p>
+                                        <p class="mb-0 text-muted"><strong>Interessado:</strong> {{ diligencia.documento.remetente.nome_razao_social }}</p>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-8 p-4 bg-white">
+                                    <h6 class="fw-bold mb-3 text-dark text-uppercase" style="font-size: 0.85rem; letter-spacing: 0.5px;">Selecione a Ação Proposta:</h6>
+                                    
+                                    <form method="POST" action="{% url 'gestao:decidir_diligencia' diligencia.id %}" enctype="multipart/form-data" onsubmit="return validarSaneamento(event, '{{ diligencia.id }}')">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="proxima_url" value="{{ request.get_full_path }}">
+                                        <div class="row g-2 mb-4">
+                                            <div class="col-md-4">
+                                                <input type="radio" class="btn-check" name="acao_gestao" id="acao_email_{{ diligencia.id }}" value="enviar_email" required onclick="updateUI('{{ diligencia.id }}', 'email')">
+                                                <label class="btn btn-outline-custom-blue w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm" for="acao_email_{{ diligencia.id }}">
+                                                    <i class="fas fa-envelope-open-text small"></i>
+                                                    <span class="fw-medium">Enviar E-mail</span>
+                                                </label>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <input type="radio" class="btn-check" name="acao_gestao" id="acao_negar_{{ diligencia.id }}" value="negar" onclick="updateUI('{{ diligencia.id }}', 'negar')">
+                                                <label class="btn btn-outline-danger w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm" for="acao_negar_{{ diligencia.id }}">
+                                                    <i class="fas fa-user-times small"></i>
+                                                    <span class="fw-medium">Negar Pedido</span>
+                                                </label>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <input type="radio" class="btn-check" name="acao_gestao" id="acao_manual_{{ diligencia.id }}" value="concluir_manual" onclick="updateUI('{{ diligencia.id }}', 'manual')">
+                                                <label class="btn btn-outline-success w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm" for="acao_manual_{{ diligencia.id }}">
+                                                    <i class="fas fa-check-double small"></i>
+                                                    <span class="fw-medium">Sanear</span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div id="container_acao_{{ diligencia.id }}" class="p-3 border rounded-3 bg-light" style="display:none; transition: all 0.3s ease;">
+                                            
+                                            <div id="form_email_{{ diligencia.id }}" style="display:none;">
+                                                <div class="row g-2 mb-3">
+                                                    <div class="col-12">
+                                                        <label class="form-label fw-bold small text-muted">Destinatário:</label>
+                                                        <input type="email" name="email_destino" class="form-control form-control-sm border-0 shadow-sm" value="{{ diligencia.documento.remetente.email|default:'' }}">
+                                                    </div>
+                                                    <div class="col-12 mt-2">
+                                                        <label class="form-label fw-bold small text-muted">Instrução ao Remetente:</label>
+                                                        <textarea id="text_email_{{ diligencia.id }}" name="texto_decisao" class="form-control border-0 shadow-sm" rows="3" placeholder="Ex: Favor anexar o contrato social atualizado..." oninput="syncPreview('{{ diligencia.id }}')"></textarea>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="card border-0 shadow-sm">
+                                                    <div class="card-header bg-dark text-white py-1 px-3 d-flex align-items-center justify-content-between">
+                                                        <small style="font-size: 0.7rem; letter-spacing: 1px;">PREVIEW DO E-MAIL</small>
+                                                        <i class="fas fa-eye fa-xs"></i>
+                                                    </div>
+                                                    <div class="card-body p-3 bg-white rounded-bottom" style="font-size: 0.85rem;">
+                                                        <p class="mb-1 text-muted"><strong>Assunto:</strong> Solicitação de Documentos - {{ diligencia.documento.protocolo }}</p>
+                                                        <hr class="my-2 opacity-25">
+                                                        <div class="text-dark">
+                                                            Prezado(a),<br>
+                                                            Para prosseguirmos com a análise, é necessário:<br>
+                                                            <span id="preview_text_{{ diligencia.id }}" class="fw-bold text-primary text-decoration-underline">[Sua instrução aqui]</span><br><br>
+                                                            Atenciosamente,<br>
+                                                            <strong>PGM - Vitória de Santo Antão</strong>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div id="form_negar_{{ diligencia.id }}" style="display:none;">
+                                                <label class="form-label fw-bold text-danger small">Justificativa do Indeferimento:</label>
+                                                <textarea name="texto_decisao_negar" class="form-control border-0 shadow-sm" rows="4" placeholder="Informe o motivo jurídico ou técnico para negar esta diligência ao procurador..."></textarea>
+                                            </div>
+
+                                            <div id="form_manual_{{ diligencia.id }}" style="display:none;">
+                                                <div class="alert alert-info border-0 small mb-3">
+                                                    <i class="fas fa-info-circle me-2"></i> Use esta opção se a pendência já foi resolvida. Você pode anexar comprovantes ou apenas descrever a solução.
+                                                </div>
+
+                                                <label class="fw-bold small mb-2">Observações da Conclusão:</label>
+                                                <textarea name="texto_decisao_sanear" class="form-control mb-3" rows="2" placeholder="Ex: Documentos conferidos via e-mail direto..."></textarea>
+
+                                                <label class="fw-bold small mb-2">Anexar Documentos (Opcional):</label>
+                                                <div id="file-container-{{ diligencia.id }}" class="mb-2">
+                                                    <div class="input-group mb-2 shadow-sm">
+                                                        <input type="file" name="arquivos_saneamento" class="form-control form-control-sm" accept=".pdf, .png, .jpg, .jpeg">
+                                                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.parentElement.remove()" title="Remover">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                
+                                                <button type="button" class="btn btn-outline-custom-blue mt-1" onclick="addFileInput('{{ diligencia.id }}')">
+                                                    <i class="fas fa-plus me-1"></i> Adicionar outro arquivo
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-4 pt-3 border-top text-end">
+                                            <button type="button" class="btn btn-link text-muted me-2" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-lg px-5 shadow-sm text-white fw-bold" style="background-color: #04357b; border: none;">
+                                                Concluir Diligência <i class="fas fa-arrow-right ms-2"></i>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+<script>
+    function toggleCamposDiligencia(select, id) {
+        const fieldEmail = document.querySelector('.field-email-' + id);
+        const fieldTexto = document.querySelector('.field-texto-' + id);
+        const labelTexto = document.getElementById('label-texto-' + id);
+        const acao = document.querySelector(`input[name="acao_gestao"][value="concluir_manual"]:checked`);
+
+        fieldEmail.style.display = 'none';
+        fieldTexto.style.display = 'block';
+
+        if (acao === 'enviar_email') {
+            fieldEmail.style.display = 'block';
+            labelTexto.innerText = "Mensagem para o Remetente:";
+        } else if (acao === 'negar') {
+            labelTexto.innerText = "Motivo do Indeferimento:";
+        } else if (acao === 'concluir_manual') {
+            labelTexto.innerText = "Observações da Conclusão:";
+        }
+    }
+
+    function updateUI(id, tipo) {
+        // 1. Garante que o container principal das ações esteja visível
+        const container = document.getElementById('container_acao_' + id);
+        if (container) container.style.display = 'block';
+        
+        // 2. O SEGREDO: Esconde TODAS as subseções primeiro
+        // Isso evita que uma fique "pendurada" embaixo da outra
+        const secoes = ['form_email_', 'form_negar_', 'form_manual_'];
+        secoes.forEach(secaoPrefix => {
+            const elemento = document.getElementById(secaoPrefix + id);
+            if (elemento) elemento.style.display = 'none';
+        });
+
+        // 3. Agora, exibe apenas a seção solicitada pelo clique
+        if (tipo === 'email') {
+            document.getElementById('form_email_' + id).style.display = 'block';
+        } else if (tipo === 'negar') {
+            document.getElementById('form_negar_' + id).style.display = 'block';
+        } else if (tipo === 'manual') {
+            document.getElementById('form_manual_' + id).style.display = 'block';
+        }
+    }
+
+    function syncPreview(id) {
+        const text = document.getElementById('text_email_' + id).value;
+        const preview = document.getElementById('preview_text_' + id);
+        preview.innerText = text || "[Seu texto aparecerá aqui]";
+    }
+
+    
+
+    // Função para adicionar novos campos de arquivo
+    function addFileInput(id) {
+        const container = document.getElementById(`file-container-${id}`);
+        const div = document.createElement('div');
+        div.className = 'input-group mb-2 shadow-sm';
+        div.innerHTML = `
+            <input type="file" name="arquivos_saneamento" class="form-control form-control-sm" accept=".pdf, .png, .jpg, .jpeg">
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        container.appendChild(div);
+    }
+
+    function validarSaneamento(event, id) {
+        const acao = document.querySelector(`input[id="acao_manual_${id}"]:checked`);
+        
+        if (acao) {
+            const fileInputs = document.querySelectorAll(`#file-container-${id} input[type="file"]`);
+            let temArquivo = false;
+            
+            fileInputs.forEach(input => {
+                if (input.files.length > 0) temArquivo = true;
+            });
+
+            if (!temArquivo) {
+                return confirm("Atenção: Nenhum arquivo foi selecionado. Deseja finalizar esta diligência apenas com a observação preenchida?");
+            }
+        }
+        return true;
+    }
+</script>
+
+    <style>
+        /* Estilo customizado para o botão com a cor #04357b */
+        .btn-outline-custom-blue {
+            color: #04357b;
+            border-color: #04357b;
+        }
+        .btn-outline-custom-blue:hover {
+            background-color: #04357b;
+            border-color: #04357b;
+            color: white;
+        }
+        .btn-check:checked + .btn-outline-custom-blue {
+            background-color: #04357b;
+            border-color: #04357b;
+            color: white;
+            box-shadow: 0 0 0 0.25rem rgba(4, 53, 123, 0.25);
+        }
+    </style>

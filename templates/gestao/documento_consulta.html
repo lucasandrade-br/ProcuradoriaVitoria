@@ -8,9 +8,32 @@
             <ul class="nav nav-pills flex-column" id="pje-tab" role="tablist">
 
                 <h5 class="text-center">Processo: {{ documento.protocolo }}</h5>
-                <a href="javascript:history.back()" class="btn btn-outline-secondary" style="background-color: #212529; color: #ffffff; border-color: #000000;">
-                        &laquo; Voltar
-                </a>
+                <div class=" d-flex w-100 gap-2">
+                    
+                    {% if origem == 'distribuicao' %}
+                        <a href="{% url 'gestao:distribuicao' %}" class="btn btn-outline-secondary flex-fill" style="background-color: #212529; color: #ffffff;">
+                            &laquo; Voltar
+                        </a>
+                    {% elif origem == 'busca' %}
+                        <a href="{% url 'gestao:busca' %}" class="btn btn-outline-secondary flex-fill" style="background-color: #212529; color: #ffffff;">
+                            &laquo; Voltar
+                        </a>
+                    {% else %}
+                        <a href="{% url 'gestao:monitoramento_analises' %}" class="btn btn-outline-secondary flex-fill" style="background-color: #212529; color: #ffffff;">
+                            &laquo; Voltar à Lista
+                    {% endif %}
+
+                    {% if user.is_superuser or 'Protocolador-Chefe' in user.groups.all|join:',' or 'Procurador-Chefe' in user.groups.all|join:',' %}
+                        {% if documento.status != 'Finalizado' %}
+                            <a href="{% url 'gestao:documento_update' pk=documento.pk %}?origem={{ origem }}" class="btn btn-warning shadow-sm flex-fill">
+                                <i class="fas fa-edit me-1"></i> Editar Dados
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+
+                
                 <hr>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active w-100 text-start" id="info-tab" data-bs-toggle="pill" 
@@ -36,6 +59,15 @@
                         <button class="nav-link w-100 text-start bg-warning text-dark" id="reativar-tab" data-bs-toggle="pill" 
                                 data-bs-target="#reativar_processo" type="button" role="tab">
                             <i class="fas fa-history fa-fw me-2"></i>4. Reativar Processo
+                        </button>
+                    </li>
+                {% endif %}
+
+                {% if not documento.procurador_atribuido %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link w-100 text-start bg-warning text-dark" id="atribuir-tab" data-bs-toggle="pill" 
+                                data-bs-target="#atribuir_procurador" type="button" role="tab">
+                            <i class="fas fa-history fa-fw me-2"></i>5. Atribuir Procurador
                         </button>
                     </li>
                 {% endif %}
@@ -183,6 +215,50 @@
                     </div>
                 {% endif %}
 
+
+                <div class="tab-pane fade" id="atribuir_procurador" role="tabpanel" aria-labelledby="atribuir-tab">
+                    
+                    {% if not documento.procurador_atribuido %}
+                        <div class="card shadow-sm">
+                            <div class="card-header">
+                                <h4 class="mb-0 ">5. Atribuição de Procurador</h4>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="{% url 'gestao:atribuir_procurador_direto' documento.id %}">
+                                    {% csrf_token %}
+                                    <div class="row align-items-end">
+                                        <div class="col-md-8">
+                                            <label class="form-label fw-bold small text-muted">Selecione o Procurador Responsável:</label>
+                                            <select name="procurador_id" class="form-select border-primary shadow-sm" required>
+                                                <option value="">--- Selecione um Procurador ---</option>
+                                                {% for procurador in procuradores %}
+                                                    <option value="{{ procurador.id }}">
+                                                        {{ procurador.get_full_name|default:procurador.username }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <button type="submit" class="btn btn-primary w-100 shadow-sm fw-bold">
+                                                <i class="fas fa-check me-2"></i> Confirmar Atribuição
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="form-text mt-2">
+                                        <i class="fas fa-info-circle me-1"></i> 
+                                        Ao atribuir, o status do processo mudará automaticamente para <strong>"Em Análise"</strong>.
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i> Este processo já foi atribuído ao procurador: 
+                            <strong>{{ documento.procurador_atribuido.get_full_name }}</strong>.
+                        </div>
+                    {% endif %}
+
+                </div>
             </div>
         </main>
     </div> <script>

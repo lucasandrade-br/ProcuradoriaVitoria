@@ -9,14 +9,12 @@
             <thead>
                 <tr class="table-dark">
                     <th style="padding: 10px 2px; text-align: center; white-space: nowrap;">Prazo</th>
-                    <th style="padding: 10px 2px; text-align: center; white-space: nowrap;">Recebido</th>
-                    <th style="padding: 10px 2px; text-align: center; white-space: nowrap;">N° Documento</th>         
-                    
+                    <th style="padding: 10px 2px; text-align: center; white-space: nowrap;">Recebido</th>                    
                     <th style="padding: 10px 2px; text-align: center; white-space: nowrap;">Protocolo</th>
                     <th style="padding: 10px 2px; text-align: center; white-space: nowrap;">Tipo</th>
                     <th style="padding: 10px 2px; text-align: center; white-space: nowrap;">Prioridade</th>
-                    
-                    <th style="padding: 10px 2px; text-align: center; white-space: nowrap;">Remetente</th>
+                    <th style="padding: 10px 2px; text-align: center; white-space: nowrap;">Status</th>
+                    <th style="padding: 10px 2px; text-align: center; white-space: nowrap;">Interessados</th>
                     <th style="padding: 10px 2px; text-align: center; white-space: nowrap;">Ações</th>
                 </tr>
             </thead>
@@ -30,13 +28,46 @@
                         {% endif %}
                     </td>
                     <td style="padding: 10px 2px; text-align: center; white-space: nowrap;">{{ doc.data_recebimento|date:"d/m/Y" }}</td>
-                    <td style="padding: 10px 2px; text-align: center; white-space: nowrap;">{{ doc.num_doc_origem }}</td>
+                    
                     
                     <td style="padding: 10px 2px; text-align: center; white-space: nowrap;">{{ doc.protocolo }}</td>
                     <td style="padding: 10px 2px; text-align: center; white-space: nowrap;">{{ doc.tipo_documento }}</td>
 
                     <td style="padding: 10px 2px; text-align: center; white-space: nowrap;">{{ doc.prioridade }}</td>
-                    <td style="padding: 10px;">{{ doc.remetente }}</td>
+                    <td style="padding: 10px 2px; text-align: center; white-space: nowrap;">
+                        {% if doc.status == 'Em Análise' %}
+                            <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">
+                                {{ doc.status }}
+                            </span>
+                        {% elif doc.status == 'Rejeitado' %}
+                            <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">
+                                {{ doc.status }}
+                            </span>
+                        {% elif doc.status == 'Em Diligência' %}
+                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+                                {{ doc.status }}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary-emphasis">
+                                {{ doc.status }}
+                            </span>
+                        {% endif %}
+
+                    </td>
+                    <td style="padding: 10px;">
+                        <div class="d-flex flex-wrap gap-1 justify-content-center">
+                            {% for interessado in doc.interessados.all %}
+                                <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle px-2 py-1" 
+                                    style="font-size: 0.7rem; font-weight: 500;" 
+                                    title="{{ interessado.nome_razao_social }}">
+                                    <i class="fas fa-university me-1"></i>{{ interessado.nome_razao_social|truncatechars:20 }}
+                                </span>
+                            {% empty %}
+                                <span class="text-muted small">Sem interessados</span>
+                            {% endfor %}
+                        </div>
+                    </td>
+
                     <td style="padding: 10px 2px; text-align: center; white-space: nowrap;">
 
                         <a href="{% url 'gestao:documento_detail' pk=doc.pk %}"

@@ -14,13 +14,31 @@
                 <h5 class="mb-0">Informações do Documento</h5>
             </div>
             <div class="card-body card-cinza-claro">
-                <div class="row g-3"> <div class="col-12">
+                <div class="row g-3"> 
+                    <div class="col-12">
                         <label for="{{ documento_form.remetente.id_for_label }}" class="form-label fw-bold">1. Remetente</label>
                         <div class="input-group">
                             {{ documento_form.remetente }}
                             <button class="btn btn-outline-secondary" type="button" id="btn-novo-remetente" title="Cadastrar Novo Remetente">
                                 <i class="fas fa-plus"></i> Novo
                             </button>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <label for="{{ documento_form.interessados.id_for_label }}" class="form-label fw-bold">1.1 Secretarias / Interessados Adicionais</label>
+                        {{ documento_form.interessados }}
+                        <div class="form-text">Selecione os outros órgãos que devem receber a resposta deste processo.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-switch p-2 border rounded bg-white shadow-sm">
+                            <div class="ms-4">
+                                {{ documento_form.notificar_remetente }}
+                                <label class="form-check-label fw-bold" for="{{ documento_form.notificar_remetente.id_for_label }}">
+                                    Deseja notificar o Remetente Principal por e-mail na finalização?
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -150,7 +168,8 @@
             $('#{{ documento_form.data_doc_origem.id_for_label }}').addClass('form-control');
             $('#{{ documento_form.observacoes_protocolo.id_for_label }}').addClass('form-control');
             $('#{{ documento_form.remetente.id_for_label }}').addClass('form-select');
-            
+            $('#{{ documento_form.interessados.id_for_label }}').addClass('form-select');
+
             // --- 1.5 SCRIPT DE ANEXOS DINÂMICOS ---
             let formsetIndex = 0;
             const anexosContainer = document.getElementById('anexos-container');
@@ -256,21 +275,35 @@
 
             
             // --- 2. SCRIPT DO SELECT2 (Busca AJAX) ---
+            const select2AjaxConfig = {
+                url: "{% url 'gestao:remetente_autocomplete' %}",
+                dataType: 'json',
+                delay: 250,
+                data: function (params) { return { term: params.term }; },
+                processResults: function (data) { return { results: data.results }; },
+                cache: true
+            };
+
+            // Remetente Único
             $('#{{ documento_form.remetente.id_for_label }}').select2({
                 placeholder: "Digite o Nome ou CPF/CNPJ para buscar...",
                 allowClear: true,
                 minimumInputLength: 2,
-                ajax: {
-                    url: "{% url 'gestao:remetente_autocomplete' %}",
-                    dataType: 'json',
-                    delay: 250,
-                    data: function (params) { return { term: params.term }; },
-                    processResults: function (data) { return { results: data.results }; },
-                    cache: true
-                },
+                ajax: select2AjaxConfig,
                 theme: "bootstrap-5",
-                
             });
+
+            // Interessados Múltiplos (NOVO)
+            $('#{{ documento_form.interessados.id_for_label }}').select2({
+                placeholder: "Busque e selecione as secretarias interessadas...",
+                allowClear: true,
+                multiple: true, // Habilita múltipla escolha
+                minimumInputLength: 2,
+                ajax: select2AjaxConfig,
+                width: '100%',
+                theme: "bootstrap-5",
+                closeOnSelect: false, // Mantém o menu aberto para facilitar várias seleções
+            });    
 
             
             // --- 3. SCRIPT DO MODAL DE REMETENTE ---
@@ -331,8 +364,19 @@
                         modalErrorsDiv.textContent = 'Erro de comunicação com o servidor.';
                     });
                 });
-            } // Fim do if (modalElement)
+            } 
+        });
+        // Localize o seu formulário
+        const formPrincipal = document.getElementById('documento-principal-form');
 
-        }); // Fim do 'DOMContentLoaded'
+        formPrincipal.addEventListener('submit', function(e) {
+            const totalAnexos = listaAnexos.children.length;
+            
+            if (totalAnexos === 0) {
+                e.preventDefault(); // Para o envio
+                alert('Erro: Você precisa adicionar pelo menos um anexo antes de salvar!');
+                return false;
+            }
+        });
     </script>
 {% endblock %}

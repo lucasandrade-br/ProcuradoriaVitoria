@@ -1,0 +1,317 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+<form method="POST" enctype="multipart/form-data" id="form-edicao-processo">
+    {% csrf_token %}
+    <input type="hidden" name="origem" value="{{ origem }}">
+    <input type="hidden" name="voltar_para" value="{{ voltar_para }}">
+
+    <div class="row g-4"> 
+        <nav class="col-md-4 col-lg-3">
+            <ul class="nav nav-pills flex-column shadow-sm bg-white p-3 rounded border" id="pje-tab" role="tablist">
+                
+                <h5 class="text-center mb-3">Processo: {{ documento.protocolo }}</h5>
+                
+                <div class="d-flex w-100 gap-2 mb-3">
+                    {% if voltar_para == 'finalizacao' %}
+                        <a href="{% url 'gestao:finalizacao_detail' pk=documento.pk %}?origem={{ origem }}" class="btn btn-outline-secondary flex-fill" style="background-color: #212529; color: #ffffff;">
+                            &laquo; Voltar
+                        </a>
+                    {% else %}
+                        <a href="{% url 'gestao:documento_consulta' pk=documento.pk %}?origem={{ origem }}" class="btn btn-outline-secondary flex-fill" style="background-color: #212529; color: #ffffff;">
+                            &laquo; Voltar
+                        </a>
+                    {% endif %}
+                    <button type="submit" class="btn btn-success shadow-sm flex-fill fw-bold">
+                        <i class="fas fa-save me-1"></i> Salvar
+                    </button>
+                </div>
+                
+                <hr class="mt-0">
+
+                <li class="nav-item mb-1" role="presentation">
+                    <button class="nav-link active w-100 text-start" id="dados-tab" data-bs-toggle="pill" 
+                            data-bs-target="#tab-dados" type="button" role="tab">
+                        <i class="fas fa-file-invoice fa-fw me-2"></i>1. Dados Estruturais
+                    </button>
+                </li>
+                <li class="nav-item mb-1" role="presentation">
+                    <button class="nav-link w-100 text-start" id="interessados-tab" data-bs-toggle="pill" 
+                            data-bs-target="#tab-interessados" type="button" role="tab">
+                        <i class="fas fa-users fa-fw me-2"></i>2. Partes Interessadas
+                    </button>
+                </li>
+                <li class="nav-item mb-1" role="presentation">
+                    <button class="nav-link w-100 text-start" id="anexos-tab" data-bs-toggle="pill" 
+                            data-bs-target="#tab-anexos" type="button" role="tab">
+                        <i class="fas fa-folder-open fa-fw me-2"></i>3. Gestão de Documentos
+                    </button>
+                </li>
+                <li class="nav-item mb-1" role="presentation">
+                    <button class="nav-link w-100 text-start" id="historico-tab" data-bs-toggle="pill" 
+                            data-bs-target="#tab-historico" type="button" role="tab">
+                        <i class="fas fa-history fa-fw me-2"></i>4. Log de Auditoria
+                    </button>
+                </li>
+                
+                <div class="alert alert-info py-2 mt-3 mb-0" style="font-size: 0.75rem;">
+                    <i class="fas fa-info-circle me-1"></i> Alterações serão auditadas e registradas no histórico.
+                </div>
+            </ul>
+        </nav>
+
+        <main class="col-md-8 col-lg-9">
+            <div class="tab-content" id="pje-tabContent">
+
+                <div class="tab-pane fade show active" id="tab-dados" role="tabpanel">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">1. Informações do Documento</h4></div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold small text-uppercase">N° Documento Origem</label>
+                                    {{ form.num_doc_origem }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold small text-uppercase">Protocolo Interno</label>
+                                    {{ form.protocolo }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold small text-uppercase">Tipo de Documento</label>
+                                    {{ form.tipo_documento }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold small text-uppercase">Prioridade</label>
+                                    {{ form.prioridade }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-bold small text-uppercase">Observações do Protocolo</label>
+                                    {{ form.observacoes_protocolo }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="tab-interessados" role="tabpanel">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">2. Partes Interessadas</h4></div>
+                        <div class="card-body">
+                            <label class="form-label fw-bold">Interessados Atuais:</label>
+                            <div id="chips-container" class="d-flex flex-wrap gap-2 mb-4 p-3 border rounded bg-light min-height-50">
+                                {% for interessado in form.instance.interessados.all %}
+                                <div class="badge bg-primary d-flex align-items-center gap-2 p-2 shadow-sm" data-id="{{ interessado.id }}">
+                                    <span><i class="fas fa-university me-1"></i>{{ interessado.nome_razao_social }}</span>
+                                    <i class="fas fa-times-circle cursor-pointer btn-remove-interessado" style="cursor: pointer;"></i>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <label class="form-label fw-bold">Adicionar Novo Interessado:</label>
+                            <select id="busca_interessado_ajax" class="form-select select2-ajax">
+                                <option value="">Pesquise por nome ou secretaria...</option>
+                                {% for remetente in form.fields.interessados.queryset %}
+                                    <option value="{{ remetente.id }}">{{ remetente.nome_razao_social }}</option>
+                                {% endfor %}
+                            </select>
+                            
+                            {{ form.interessados }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="tab-anexos" role="tabpanel">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h4 class="mb-0">3. Documentos e Conferência</h4>
+                            <button type="button" class="btn btn-primary btn-sm" id="btn-add-anexo">
+                                <i class="fas fa-plus me-1"></i> Adicionar Documento
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-lg-5 border-end">
+                                    <div id="anexos-container">
+                                        {{ formset.management_form }}
+                                        {% for anexo_form in formset %}
+                                            <div class="anexo-form-row card mb-3 p-2 bg-light-subtle border shadow-sm" data-prefix="{{ formset.prefix }}">
+                                                
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <span class="small fw-bold text-truncate" style="max-width: 140px;">
+                                                        {% if anexo_form.instance.pk %}
+                                                            <i class="fas fa-file-pdf text-danger me-1"></i>{{ anexo_form.instance.arquivo.name|cut:"anexos/" }}
+                                                        {% else %}
+                                                            <span class="text-success text-uppercase" style="font-size: 0.7rem;">+ Novo Arquivo</span>
+                                                        {% endif %}
+                                                    </span>
+
+                                                    <div class="d-flex gap-2 align-items-center">
+                                                        {% if anexo_form.instance.pk %}
+                                                            <button type="button" class="btn btn-sm btn-dark" 
+                                                                    onclick="loadPdf('viewer-edicao', '{{ anexo_form.instance.arquivo.url }}')"
+                                                                    title="Visualizar este PDF">
+                                                                <i class="fas fa-eye text-white"></i>
+                                                            </button>
+                                                        {% endif %}
+                                                        
+                                                        <div class="form-check form-switch pt-1" title="Ativo / Inativo">
+                                                            {{ anexo_form.ativo }}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {{ anexo_form.arquivo }}
+                                                <div class="mt-2">{{ anexo_form.tipo_anexo }}</div>
+                                                {{ anexo_form.id }}
+                                            </div>
+                                        {% endfor %}
+                                        
+                                        <div id="empty-form-placeholder"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-lg-7">
+                                    <div class="sticky-top" style="top: 10px;">
+                                        <iframe id="viewer-edicao" src="" width="100%" style="height: 85vh;" class="rounded bg-dark"></iframe>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="empty-anexo-form" class="d-none">
+                    <div class="anexo-form-row card mb-3 p-2 border-primary border-dashed bg-primary-subtle shadow-sm animate__animated animate__fadeIn">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="badge bg-primary">NOVO DOCUMENTO</span>
+                            <button type="button" class="btn-close btn-remove-form" style="font-size: 0.7rem;"></button>
+                        </div>
+                        {{ formset.empty_form.arquivo }}
+                        <div class="mt-2">{{ formset.empty_form.tipo_anexo }}</div>
+                        <div class="d-none">{{ formset.empty_form.ativo }}</div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="tab-historico" role="tabpanel">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><h4 class="mb-0">4. Histórico de Alterações (Audit)</h4></div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th class="ps-3">Data/Hora</th>
+                                            <th>Usuário</th>
+                                            <th>Campo</th>
+                                            <th>De (Antigo)</th>
+                                            <th>Para (Novo)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for log in documento.historico.all %}
+                                        <tr>
+                                            <td class="ps-3">{{ log.data_alteracao|date:"d/m/Y H:i" }}</td>
+                                            <td class="fw-bold text-primary">{{ log.usuario.username }}</td>
+                                            <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ log.campo_alterado }}</span></td>
+                                            <td class="text-danger-emphasis small">{{ log.valor_antigo|truncatechars:35 }}</td>
+                                            <td class="text-success-emphasis fw-bold">{{ log.valor_novo|truncatechars:35 }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="5" class="text-center py-5 text-muted fst-italic">Nenhum registro de alteração encontrado.</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</form>
+
+<script>
+    // Função para carregar o PDF (Mesmo padrão da análise)
+    function loadPdf(iframeId, url) { 
+        const iframe = document.getElementById(iframeId);
+        if(iframe) { iframe.src = url; }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auto-load do primeiro PDF ao entrar na aba 3
+        const tabAnexosBtn = document.getElementById('anexos-tab');
+        
+        if (tabAnexosBtn) {
+            tabAnexosBtn.addEventListener('shown.bs.tab', function () {
+                const firstAnexoBtn = document.querySelector('#anexos-list button');
+                const viewer = document.getElementById('viewer-edicao');
+                if (firstAnexoBtn && (viewer.src === "" || viewer.src === window.location.href)) {
+                    firstAnexoBtn.click();
+                }
+            });
+        }
+    });
+
+document.addEventListener('DOMContentLoaded', function() {
+    // --- LÓGICA DE INTERESSADOS (CHIPS) ---
+    const selectHidden = document.getElementById('id_interessados_hidden');
+    const selectAjax = $('#busca_interessado_ajax');
+
+    // Inicializa Select2 para busca
+    selectAjax.select2({ theme: 'bootstrap-5', width: '100%' });
+
+    // Ao selecionar no busca_interessado_ajax, adiciona chip e marca no select hidden
+    selectAjax.on('select2:select', function (e) {
+        const data = e.params.data;
+        const id = data.id;
+        const text = data.text;
+
+        // Verifica se já não existe
+        if (![...selectHidden.options].some(opt => opt.value === id && opt.selected)) {
+            // Marca como selecionado no hidden real
+            Array.from(selectHidden.options).find(opt => opt.value === id).selected = true;
+
+            // Cria o chip visual
+            const chip = `
+                <div class="badge bg-primary d-flex align-items-center gap-2 p-2 animate__animated animate__bounceIn" data-id="${id}">
+                    <span><i class="fas fa-university me-1"></i>${text}</span>
+                    <i class="fas fa-times-circle cursor-pointer btn-remove-interessado" style="cursor: pointer;"></i>
+                </div>`;
+            document.getElementById('chips-container').insertAdjacentHTML('beforeend', chip);
+        }
+        selectAjax.val('').trigger('change');
+    });
+
+    // Remover Interessado (Botão X)
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-remove-interessado')) {
+            const chip = e.target.closest('.badge');
+            const id = chip.dataset.id;
+            // Desmarca no select hidden real
+            Array.from(selectHidden.options).find(opt => opt.value === id).selected = false;
+            chip.remove();
+        }
+    });
+
+    // --- LÓGICA DE ANEXOS DINÂMICOS ---
+    const btnAddAnexo = document.getElementById('btn-add-anexo');
+    const totalForms = document.getElementById('id_anexos-TOTAL_FORMS'); // ID padrão do Django
+
+    btnAddAnexo.addEventListener('click', function() {
+        const currentFormCount = parseInt(totalForms.value);
+        const template = document.getElementById('empty-anexo-form').innerHTML;
+        
+        // Substitui o prefixo __prefix__ pelo número atual do form
+        const newFormHtml = template.replace(/__prefix__/g, currentFormCount);
+        
+        document.getElementById('empty-form-placeholder').insertAdjacentHTML('beforebegin', newFormHtml);
+        
+        // Atualiza o contador total de forms para o Django não se perder
+        totalForms.value = currentFormCount + 1;
+    });
+});
+
+</script>
+{% endblock %}

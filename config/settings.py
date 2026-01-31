@@ -116,12 +116,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
+LANGUAGE_CODE = env('LANGUAGE_CODE', default='pt-br')
+TIME_ZONE = env('TIME_ZONE', default='America/Sao_Paulo')
 USE_I18N = True
-
 USE_TZ = True
 
 
@@ -141,7 +138,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Define a URL da nossa página de login personalizada
 LOGIN_URL = '/accounts/login/' 
 # Define para onde redirecionar o usuário APÓS um login bem-sucedido
-LOGIN_REDIRECT_URL = 'gestao:dashboard' # Redireciona para o Dashboard ('/')
+LOGIN_REDIRECT_URL = 'gestao:dashboard'
 # Define para onde redirecionar o usuário APÓS o logout
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 X_FRAME_OPTIONS = 'SAMEORIGIN'
@@ -201,3 +198,12 @@ LOGGING = {
         },
     },
 }
+
+# Configurações de Segurança para Produção (HTTPS)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000 # 1 ano
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True

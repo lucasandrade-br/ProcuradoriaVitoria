@@ -11,6 +11,8 @@ class DocumentoForm(forms.ModelForm):
         # Define quais campos do modelo 'Documento' queremos no formulário
         fields = [
             'remetente', 
+            'interessados',
+            'notificar_remetente',
             'tipo_documento', 
             'prioridade',
             'num_doc_origem', 
@@ -19,6 +21,7 @@ class DocumentoForm(forms.ModelForm):
         ]
         
         widgets = {
+            'interessados': forms.SelectMultiple(attrs={'class': 'form-control select2-multiple'}),
             'data_doc_origem': forms.DateInput(
                 attrs={'type': 'date'} # Transforma o campo de data em um seletor de calendário HTML5
             ),
@@ -70,37 +73,52 @@ class FinalizacaoForm(forms.ModelForm):
         self.fields['obs_finalizacao'].label = ""
 
 class DocumentoFilterForm(forms.Form):
-    # Usamos 'required=False' em todos, pois o usuário pode preencher
-    # apenas os filtros que desejar.
-    
     protocolo = forms.CharField(
         label='Número do Protocolo', 
         required=False,
-        widget=forms.TextInput(attrs={'placeholder': 'Ex: 2025-10-21-001'})
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Ex: 2025-10-21-001',
+            'class': 'form-control' # Adicionado
+        })
     )
     
-    remetente = forms.ModelChoiceField(
-        label='Remetente',
+    interessados = forms.ModelChoiceField(
         queryset=Remetente.objects.all().order_by('nome_razao_social'),
-        required=False
+        required=False,
+        label="Interessado",
+        widget=forms.Select(attrs={'class': 'form-select select2'})
     )
     
     status = forms.ChoiceField(
         label='Status do Documento',
-        choices=[('', 'Todos os Status')] + Documento.STATUS_CHOICES, # Adiciona 'Todos' à lista
-        required=False
+        choices=[('', 'Todos os Status')] + Documento.STATUS_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}) # Adicionado
     )
 
     data_inicio = forms.DateField(
-        label='Recebido de (Data Início)',
+        label='Recebido de',
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date'})
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control' # Adicionado
+        })
     )
     
     data_fim = forms.DateField(
-        label='Recebido até (Data Fim)',
+        label='Recebido até',
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date'})
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control' # Adicionado
+        })
+    )
+
+    tipo_documento = forms.ModelChoiceField(
+        queryset=TipoDocumento.objects.all().order_by('descricao'), # A-Z
+        required=False,
+        label="Tipo de Documento",
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
 
 class AnexoForm(forms.ModelForm):
@@ -191,3 +209,34 @@ class PinForm(forms.Form):
         
         return cleaned_data
     
+class DocumentoUpdateForm(forms.ModelForm):
+    class Meta:
+        model = Documento
+        fields = ['num_doc_origem', 'protocolo', 'tipo_documento', 'prioridade', 'interessados', 'observacoes_protocolo']
+        widgets = {
+            # Protocolo como Readonly (Apenas Leitura)
+            'protocolo': forms.TextInput(attrs={'readonly': 'readonly', 'class': 'form-control-plaintext fw-bold px-2'}),
+            'num_doc_origem': forms.TextInput(attrs={'class': 'form-control'}),
+            'tipo_documento': forms.Select(attrs={'class': 'form-select'}),
+            'prioridade': forms.Select(attrs={'class': 'form-select'}),
+            # O campo original de interessados ficará escondido, o JS cuidará dele
+            'interessados': forms.SelectMultiple(attrs={'class': 'd-none', 'id': 'id_interessados_hidden'}),
+            'observacoes_protocolo': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Garante que a lista de interessados venha ordenada de A-Z
+        self.fields['interessados'].queryset = Remetente.objects.all().order_by('nome_razao_social')
+
+AnexoUpdateFormSet = inlineformset_factory(
+    Documento, Anexo,
+    fields=('arquivo', 'tipo_anexo', 'ativo'),
+    extra=1,           # Permite adicionar um novo campo vazio para novo upload
+    can_delete=True,   # No template, trataremos isso como 'Inativar'
+    widgets={
+        'tipo_anexo': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+        'arquivo': forms.FileInput(attrs={'class': 'form-control form-control-sm'}),
+        'ativo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    }
+)

@@ -15,7 +15,7 @@
                 <th class="text-center">Tipo de Documento</th>
                 <th class="text-center">Prioridade</th> 
                 <th class="text-center">Procurador</th> 
-                <th class="text-center">Remetente</th>
+                <th class="text-center">Interessados</th>
                 <th class="text-center">Ações</th> 
             </tr>
         </thead>
@@ -45,7 +45,19 @@
                 <td class="text-center">{{ doc.tipo_documento }}</td>
                 <td class="text-center">{{ doc.prioridade }}</td>
                 <td class="text-start">{{ doc.procurador_atribuido.get_full_name|default:doc.procurador_atribuido.username }}</td>
-                <td class="text-start">{{ doc.remetente }}</td>
+                <td class="text-start">
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for interessado in doc.interessados.all %}
+                            <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle px-2 py-1" 
+                                style="font-size: 0.75rem;" 
+                                title="{{ interessado.nome_razao_social }}">
+                                <i class="fas fa-university me-1"></i>{{ interessado.nome_razao_social|truncatechars:25 }}
+                            </span>
+                        {% empty %}
+                            <span class="text-muted small italic">Nenhum interessado</span>
+                        {% endfor %}
+                    </div>
+                </td>
                 
                 <td class="text-center"> 
                     <a href="{% url 'gestao:finalizacao_detail' pk=doc.pk %}" title="Acessar Processo" 

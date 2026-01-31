@@ -41,14 +41,13 @@
             <thead>
                 <tr class="table-dark">
                     <th class="text-center">X</th>
-                    
                     <th class="text-center">Recebido em</th>
                     <th class="text-center">N° Documento</th>
                     <th class="text-center">Protocolo</th>
                     <th class="text-center">Tipo</th>
                     <th class="text-center">Prioridade</th>
                     <th class="text-center">Status</th>          
-                    <th class="text-center">Remetente</th> 
+                    <th class="text-center" style="width: 20%;">Interessados</th> 
                     <th class="text-center">Ver</th> 
                 </tr>
             </thead>
@@ -72,20 +71,31 @@
                                     Motivo: {{ doc.motivo_ultima_devolucao|truncatechars:20 }}
                                 </small>
                             {% endif %}
-
                         {% elif doc.motivo_ultima_reativacao %}
                             <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis d-block mb-1">Reativado!</span>
-                            
                         {% else %}
-                             <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis">
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis">
                                 {{ doc.status }}
                             </span>
                         {% endif %}
                     </td>
-                    <td class="text-start">{{ doc.remetente }}</td>
+
+                    <td class="text-start">
+                        <div class="d-flex flex-wrap gap-1">
+                            {% for interessado in doc.interessados.all %}
+                                <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle px-2 py-1" 
+                                    style="font-size: 0.75rem;" 
+                                    title="{{ interessado.nome_razao_social }}">
+                                    <i class="fas fa-university me-1"></i>{{ interessado.nome_razao_social|truncatechars:25 }}
+                                </span>
+                            {% empty %}
+                                <span class="text-muted small italic">Nenhum interessado</span>
+                            {% endfor %}
+                        </div>
+                    </td>
 
                     <td class="text-center">
-                        <a href="{% url 'gestao:documento_consulta' pk=doc.pk %}" 
+                        <a href="{% url 'gestao:documento_consulta' pk=doc.pk %}?origem=distribuicao" 
                             class="btn btn-sm" 
                             style="background-color: #04357b; color: white; --bs-btn-padding-y: .15rem; --bs-btn-padding-x: .4rem; --bs-btn-font-size: .8rem;"
                             title="Ver detalhes e anexos"> 
@@ -95,8 +105,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="9" class="text-center p-3"> Nenhum documento aguardando distribuição no momento.
-                    </td>
+                    <td colspan="9" class="text-center p-3"> Nenhum documento aguardando distribuição no momento.</td>
                 </tr>
                 {% endfor %}
             </tbody>

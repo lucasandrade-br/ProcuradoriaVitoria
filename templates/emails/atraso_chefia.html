@@ -1,0 +1,39 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2 style="color: #04357b; margin-bottom: 10px;">Relatório Consolidado de Atrasos</h2>
+<p>Total de processos expirados no sistema: <strong>{{ total_geral }}</strong></p>
+
+{% for grupo in agrupamento %}
+    <div style="margin-top: 30px; border-bottom: 2px solid #04357b; padding-bottom: 5px;">
+        <h3 style="color: #333; margin-bottom: 5px;">
+            <i class="fas fa-user-tie"></i> {{ grupo.nome }} — 
+            <span style="color: #dc3545;">{{ grupo.total_processos }} Processo(s)</span>
+        </h3>
+    </div>
+
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;">
+        <thead>
+            <tr style="background-color: #f8f9fa; color: #555;">
+                <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 40%;">Protocolo</th>
+                <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Data Limite</th>
+                <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Atraso</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for doc in grupo.processos %}
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;">{{ doc.protocolo }}</td>
+                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">{{ doc.data_limite|date:"d/m/Y" }}</td>
+                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #dc3545;">
+                    {{ doc.dias_atraso }} dias
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endfor %}
+
+<div class="divider"></div>
+<p style="font-size: 13px; color: #888;">Relatório gerado em {{ hoje|date:"d/m/Y" }} para monitoramento institucional.</p>
+{% endblock %}

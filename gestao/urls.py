@@ -25,5 +25,9 @@ urlpatterns = [
     path('verificar-pin/ajax/', views.verificar_pin_ajax_view, name='verificar_pin_ajax'),
     path('rejeitar/<int:pk>/', views.rejeitar_confirmacao_view, name='rejeitar_confirmacao'),
     path('documento/<int:pk>/excluir_anexo/<int:anexo_id>/', views.excluir_anexo_view, name='excluir_anexo'),
+    path('documento/<int:pk>/editar/', views.documento_update_view, name='documento_update'),
+    path('diligencias/', views.diligencias_pendentes_view, name='diligencias'),
+    path('diligencia/decidir/<int:diligencia_id>/', views.decidir_diligencia_view, name='decidir_diligencia'),
+    path('documento/atribuir/<int:pk>/', views.atribuir_procurador_direto_view, name='atribuir_procurador_direto'),
 ]
 

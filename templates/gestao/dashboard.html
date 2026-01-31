@@ -66,11 +66,25 @@
         </div>
         {% endif %}
 
+        {% if 'Protocolador-Chefe' in user.groups.all|join:',' or 'Procurador-Chefe' in user.groups.all|join:',' or user.is_superuser %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card text-center shadow-sm h-100">
+                <div class="card-body card-body-claro">
+                    <h1 class="card-title display-4">{{ total_diligencias_pendentes }}</h1>
+                    <p class="card-text fs-5">Diligências em Aberto</p>
+                </div>
+                <a href="{% url 'gestao:diligencias' %}" class="card-footer text-decoration-none card-footer-cinza-escuro">
+                    Ver Diligências <i class="fas fa-arrow-circle-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
         {% if 'Cadastrante' in user.groups.all|join:',' or user.is_superuser %}
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card text-center shadow-sm">
                 <div class="card-body card-body-claro">
-                    <h1 class="card-text fs-5">Cadastrar Documento</h1>
+                    <h1 class="card-text fs-5">Cadastrar Processo</h1>
                 </div>
                 <a href="{% url 'gestao:documento_create' %}" class="card-footer text-decoration-none card-body-azul-escuro">
                     Acessar cadastro<i class="fas fa-arrow-circle-right ms-1"></i>

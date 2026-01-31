@@ -1,0 +1,27 @@
+{% extends 'emails/base_email.html' %}
+
+{% block content %}
+<p>Prezado(a) <strong>{{ nome }}</strong>,</p>
+<p>Identificamos os seguintes processos sob sua responsabilidade que excederam o prazo limite até o dia {{ hoje|date:"d/m/Y" }}:</p>
+
+<table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+    <thead>
+        <tr style="background-color: #f2f2f2; text-align: left;">
+            <th style="padding: 10px; border: 1px solid #ddd;">Protocolo</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Data Limite</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Atraso</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for doc in processos %}
+        <tr>
+            <td style="padding: 10px; border: 1px solid #ddd;">{{ doc.protocolo }}</td>
+            <td style="padding: 10px; border: 1px solid #ddd; color: #d9534f;">{{ doc.data_limite|date:"d/m/Y" }}</td>
+            <td style="padding: 10px; border: 1px solid #ddd;"><strong>{{ doc.dias_atraso }} dias</strong></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p style="margin-top: 20px;">Solicitamos a regularização o mais breve possível diretamente no sistema.</p>
+{% endblock %}

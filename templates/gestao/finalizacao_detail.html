@@ -6,9 +6,19 @@
     <div class="row g-4"> <nav class="col-md-4 col-lg-3">
             <ul class="nav nav-pills flex-column" id="pje-tab" role="tablist">
                 <h5 class="text-center">Processo: {{ documento.protocolo }}</h5>
-                <a href="{% url 'gestao:monitoramento_analises' %}" class="btn btn-outline-secondary" style="background-color: #212529; color: #ffffff; border-color: #000000; margin-bottom: 1rem;">
-                    &laquo; Voltar à Lista
-                </a>
+                <div class=" d-flex w-100 gap-2">
+                    <a href="{% url 'gestao:monitoramento_analises' %}" class="btn btn-outline-secondary flex-fill" style="background-color: #212529; color: #ffffff; border-color: #000000;">
+                        &laquo; Voltar à Lista
+                    </a>
+                    {% if user.is_superuser or 'Protocolador-Chefe' in user.groups.all|join:',' or 'Procurador-Chefe' in user.groups.all|join:',' %}
+                        {% if documento.status != 'Finalizado' %}
+                            <a href="{% url 'gestao:documento_update' pk=documento.pk %}?origem={{ origem }}&voltar_para=finalizacao" class="btn btn-warning shadow-sm flex-fill">
+                                <i class="fas fa-edit me-1"></i> Editar Dados
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
                 <hr>
 
                 <li class="nav-item" role="presentation">
@@ -41,9 +51,17 @@
                         <i class="fas fa-check-circle fa-fw me-2"></i>5. Registrar Finalização
                     </button>
                 </li>
+                {% if documento.solicitacoes.exists %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link w-100 text-start bg-warning text-dark" id="diligencias-tab" data-bs-toggle="pill" 
+                            data-bs-target="#diligencias" type="button" role="tab" onsubmit="return validarSaneamento(event, '{{ diligencia.id }}')">
+                        <i class="fas fa-gavel fa-fw me-2"></i>6. Analisar Diligências
+                    </button>
+                </li>
+                {% endif %}
             </ul>
         </nav>
-
+        
         <main class="col-md-8 col-lg-9">
             <div class="tab-content" id="pje-tabContent">
 
@@ -52,14 +70,7 @@
                         <div class="card-header"><h4 class="mb-0">1. Informações Gerais</h4></div>
                         <div class="card-body">
                             <ul class="list-group list-group-flush">
-                                {% if documento.motivo_rejeicao_analista %}
-                                    <div class="alert alert-danger text-center">    
-                                        <strong>Rejeição do analista: {{ documento.motivo_rejeicao_analista |linebreaksbr }}</strong>
-                                    </div>
-                                {% endif %}
-
-
-
+                                
                                 <li class="list-group-item"><strong>Status:</strong> <span class="badge rounded-pill 
                                     {% if documento.status == 'Análise Concluída' %}
                                         bg-success-subtle text-success-emphasis
@@ -99,8 +110,14 @@
                                 {% endif %}
 
                                 </ul>
-                        </div>
+                        </div>        
                     </div>
+                        {% if documento.motivo_rejeicao_analista %}
+                            <hr>
+                            <div class="alert alert-danger text-center">    
+                                <strong>Rejeição do analista: {{ documento.motivo_rejeicao_analista |linebreaksbr }}</strong>
+                            </div>
+                        {% endif %}
                 </div>
 
                 <div class="tab-pane fade" id="documentos_iniciais" role="tabpanel" aria-labelledby="docs-tab"
@@ -230,19 +247,81 @@
                     </div>
                 </div>
 
+                {% if documento.solicitacoes.exists %}
+                <div class="tab-pane fade" id="diligencias" role="tabpanel" aria-labelledby="diligencias-tab">
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <h4 class="mb-0">6. Histórico de Diligências e Saneamento</h4>
+                        </div>
+                        
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr class="small text-uppercase text-secondary">
+                                            <th class="ps-3">Data</th>
+                                            <th>Procurador</th>
+                                            <th>Solicitação de Documento</th>
+                                            <th class="text-center">Status</th>
+                                            <th>Decisão da Chefia</th>
+                                            <th class="text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for diligencia in documento.solicitacoes.all %}
+                                        <tr>
+                                            <td class="ps-3 small">{{ diligencia.data_solicitacao|date:"d/m/Y H:i" }}</td>
+                                            <td>
+                                                <div class="small fw-bold">
+                                                    {{ diligencia.procurador.get_full_name|default:diligencia.procurador.username }}
+                                                </div>
+                                            </td>
+                                            <td class="small" style="max-width: 300px;">
+                                                <span title="{{ diligencia.descricao_necessidade }}">
+                                                    {{ diligencia.descricao_necessidade|truncatechars:100 }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                {% if diligencia.status == 'Pendente' %}
+                                                    <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">Pendente</span>
+                                                {% elif diligencia.status == 'Enviada' %}
+                                                    <span class="badge rounded-pill bg-info-subtle text-info-emphasis">E-mail Enviado</span>
+                                                {% elif diligencia.status == 'Atendida' %}
+                                                    <span class="badge rounded-pill bg-success-subtle text-success-emphasis">Atendida</span>
+                                                {% else %}
+                                                    <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis">Rejeitada</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="small text-muted fst-italic ps-2">
+                                                {{ diligencia.observacao_chefia|default:"Sem observações."|truncatechars:80 }}
+                                            </td>
+                                            <td class="text-center">
+                                                {% if diligencia.status == 'Pendente' %}
+                                                    <a href="#" class="text-decoration-none" style="color: #04357b;"
+                                                    data-bs-toggle="modal" data-bs-target="#modalDiligencia{{ diligencia.id }}">
+                                                    <i class="fas fa-gavel"></i>
+                                                    </a>
+                                                    
+                                                    {% include 'gestao/modal_decisao.html' with diligencia=diligencia %}
+                                                {% else %}
+                                                    
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
 
-
-
-
+                </div>
             </div>
         </div>
-
-
-                
-
-            </div>
         </main>
-    </div> 
+
     
     <div class="modal fade" id="pin-modal" tabindex="-1" aria-labelledby="pinModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">

@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-from datetime import timedelta 
+from datetime import datetime, timedelta 
 from django.utils import timezone
 from django.core.validators import FileExtensionValidator
 
@@ -64,23 +64,28 @@ class Documento(models.Model):
     protocolo = models.CharField(max_length=50, unique=True, verbose_name="Protocolo")
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='Aguardando Distribuição') # <-- Aumentei max_length para 50
     remetente = models.ForeignKey(Remetente, on_delete=models.PROTECT, verbose_name="Remetente")
+    interessados = models.ManyToManyField(
+        Remetente, 
+        related_name='processos_interessados', 
+        blank=True, 
+        verbose_name="Interessados / Secretarias"
+    )
+    
+   
+    notificar_remetente = models.BooleanField(default=False, verbose_name="Notificar Remetente na Finalização?")
     tipo_documento = models.ForeignKey(TipoDocumento, on_delete=models.PROTECT, verbose_name="Tipo de Documento")
     prioridade = models.ForeignKey(NivelPrioridade, on_delete=models.PROTECT, verbose_name="Prioridade")
-    
     num_doc_origem = models.CharField(max_length=100, verbose_name="Número do Doc. de Origem")
     data_doc_origem = models.DateField(verbose_name="Data do Doc. de Origem")
-    
     observacoes_protocolo = models.TextField(blank=True, null=True, verbose_name="Observações do Protocolo")
-    
     protocolado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='documentos_protocolados', verbose_name="Protocolado por")
     procurador_atribuido = models.ForeignKey(User, on_delete=models.PROTECT, related_name='documentos_atribuidos', blank=True, null=True, verbose_name="Procurador Atribuído")
 
     data_recebimento = models.DateTimeField(auto_now_add=True, verbose_name="Data de Recebimento")
     data_atribuicao = models.DateTimeField(blank=True, null=True, verbose_name="Data de Atribuição")
     data_finalizacao = models.DateTimeField(blank=True, null=True, verbose_name="Data de Finalização")
-    data_limite = models.DateField(blank=True, null=True, verbose_name="Data Limite para Resposta") # <-- NOVO CAMPO
+    data_limite = models.DateField(blank=True, null=True, verbose_name="Data Limite para Resposta")
     data_resposta_procurador = models.DateTimeField(blank=True, null=True, verbose_name="Data da Resposta do Procurador")
-
     obs_finalizacao = models.TextField(blank=True, null=True, verbose_name="Observações da Finalização")
 
     finalizado_por = models.ForeignKey(
@@ -97,7 +102,7 @@ class Documento(models.Model):
     @property
     def esta_atrasado(self):
         if self.data_limite and not self.data_finalizacao:
-            return timezone.now().date() > self.data_limite
+            return timezone.localdate() > self.data_limite
         return False
 
     def __str__(self):
@@ -107,14 +112,13 @@ class Documento(models.Model):
         verbose_name = "Documento"
         verbose_name_plural = "Documentos"
 
-# --- LÓGICA AUTOMÁTICA CORRIGIDA ABAIXO ---
+
     def save(self, *args, **kwargs):
         
-        if not self.pk: # Se self.pk é None, significa que é um objeto novo (INSERT)
-            hoje = timezone.now().date()
+        if not self.pk: 
+            hoje = timezone.localdate()
             prefixo = hoje.strftime('%Y-%m-%d')
             
-            # Busca o último documento criado HOJE para pegar o sequencial
             ultimo_doc_hoje = Documento.objects.filter(protocolo__startswith=prefixo).order_by('-protocolo').first()
             
             sequencial = 1
@@ -131,19 +135,12 @@ class Documento(models.Model):
             sequencial_formatado = f"{sequencial:03d}" 
             
             self.protocolo = f"{prefixo}-{sequencial_formatado}"
-        # --- FIM DA LÓGICA DO PROTOCOLO ---
 
-        # NOVA LÓGICA:
-        # Se uma data de atribuição for definida, SEMPRE (re)calcula a data limite.
         if self.data_atribuicao:
-            # Pega o número de dias da Prioridade relacionada
             dias_prazo = self.prioridade.prazo_dias
             
-            # Calcula a data limite somando os dias à data de atribuição
-            # Usamos .date() para converter o DateTimeField (data e hora) para apenas Date (data)
             self.data_limite = self.data_atribuicao.date() + timedelta(days=dias_prazo)
         
-        # Se a data de atribuição for removida (ficar nula), a data limite também é zerada.
         else:
             self.data_limite = None
             
@@ -175,9 +172,6 @@ def first_initial_attachment_url(self):
         return None
         # --- FIM DEBUGGING ---
 
-
-
-# ... (Modelo Anexo - continua igual) ...
 class Anexo(models.Model):
     TIPO_CHOICES = [
         ('INICIAL', 'Documento Inicial'),
@@ -197,7 +191,7 @@ class Anexo(models.Model):
     usuario_upload = models.ForeignKey(User, on_delete=models.PROTECT, verbose_name="Enviado por")
     data_upload = models.DateTimeField(auto_now_add=True, verbose_name="Data de Upload")
     ativo = models.BooleanField(default=True, verbose_name="Ativo")
-
+    descricao = models.TextField(blank=True, null=True, verbose_name="Descrição")
     def __str__(self):
         return self.arquivo.name
     
@@ -211,3 +205,38 @@ class Profile(models.Model):
 
     def __str__(self):
         return self.user.username
+    
+
+class HistoricoEdicao(models.Model):
+    documento = models.ForeignKey(Documento, on_delete=models.CASCADE, related_name='historico')
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    data_alteracao = models.DateTimeField(auto_now_add=True)
+    campo_alterado = models.CharField(max_length=100)
+    valor_antigo = models.TextField(null=True, blank=True)
+    valor_novo = models.TextField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-data_alteracao']
+
+class SolicitacaoDocumento(models.Model):
+    STATUS_CHOICES = [
+        ('Pendente', 'Pendente de Análise'),
+        ('Enviada', 'E-mail enviado ao Remetente'),
+        ('Atendida', 'Documento anexado / Concluída'),
+        ('Rejeitada', 'Solicitação Negada pela Chefia'),
+    ]
+
+    documento = models.ForeignKey(Documento, on_delete=models.CASCADE, related_name='solicitacoes')
+    procurador = models.ForeignKey(User, on_delete=models.CASCADE, related_name='minhas_solicitacoes')
+    descricao_necessidade = models.TextField(help_text="Explique quais documentos faltam.")
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pendente')
+    data_solicitacao = models.DateTimeField(auto_now_add=True)
+    
+    # Resposta da Chefia
+    analisado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    observacao_chefia = models.TextField(blank=True, null=True)
+    data_resposta = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Diligência {self.id} - {self.documento.protocolo}"

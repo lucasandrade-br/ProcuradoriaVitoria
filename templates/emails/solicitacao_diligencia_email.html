@@ -1,0 +1,40 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Solicitação de Documentação - PGM{% endblock %}
+
+{% block content %}
+    <div class="greeting">
+        Prezado(a) <strong>{{ remetente_nome }}</strong>,
+    </div>
+
+    <p>
+        Informamos que o seu processo sob o protocolo <strong>{{ protocolo }}</strong> está sendo analisado pela Procuradoria Geral do Município da Vitória de Santo Antão.
+    </p>
+
+    <p>
+        Durante a análise técnica, foi identificada a necessidade de <strong>informações ou documentos complementares</strong> para o prosseguimento da demanda.
+    </p>
+
+    <div class="document-box">
+        <h2>Detalhamento da Solicitação</h2>
+        <div class="info-row">
+            <span class="info-label">O que é necessário:</span><br>
+            <span class="info-value" style="font-style: italic;">"{{ texto_solicitacao }}"</span>
+        </div>
+    </div>
+
+    <div class="alert-box">
+        <strong>Como proceder:</strong><br>
+        Você pode responder a este e-mail anexando os arquivos solicitados ou dirigir-se à sede da Procuradoria para entrega física, mencionando o número do protocolo.
+    </div>
+
+    <p>
+        A celeridade na entrega desta documentação é fundamental para a conclusão do seu parecer.
+    </p>
+
+    <p style="margin-top: 30px;">
+        Atenciosamente,<br>
+        <br>
+        Procuradoria Geral do Município da Vitória de Santo Antão
+    </p>
+{% endblock %}

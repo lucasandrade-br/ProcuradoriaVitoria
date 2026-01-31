@@ -80,7 +80,7 @@
             width: 260px;
             min-width: 260px;
             /* Garante que o menu flutue por cima do conteúdo */
-            
+            position: absolute;
             z-index: 1050;
             box-shadow: 5px 0 15px rgba(0,0,0,0.3); 
         }
@@ -260,6 +260,111 @@
         #content table {
             font-size: 0.9em; /* Ajuste este valor conforme sua preferência (0.8em, 0.85em, etc.) */
         }
+
+
+
+        /* --- RESPONSIVIDADE MOBILE EXTREMO --- */
+
+        @media (max-width: 767.98px) {
+            .main-wrapper {
+                flex-direction: column; /* No mobile, header em cima, conteúdo embaixo */
+            }
+
+            #sidebar {
+                position: fixed;
+                left: -260px; /* Esconde o menu totalmente para a esquerda */
+                z-index: 2000;
+                transition: all 0.3s ease-in-out;
+                box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+            }
+
+            /* Quando o menu está "Ativado" no mobile */
+            #sidebar.show-mobile {
+                left: 0;
+            }
+
+            /* O conteúdo ocupa a tela toda no mobile */
+            #content {
+                padding: 15px; /* Menos padding para ganhar espaço */
+            }
+
+            /* Esconde o botão original de colapsar no mobile, usaremos o do header */
+            #sidebarCollapse {
+                display: none;
+            }
+        }
+
+        /* Overlay para escurecer o fundo quando o menu abrir no mobile */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1500;
+        }
+        .sidebar-overlay.active {
+            display: block;
+        } 
+        
+        /* Impede o Select2 de ultrapassar os limites da tela */
+        .select2-container {
+            width: 100% !important;
+            max-width: 100% !important;
+            display: block !important;
+        }
+
+        /* Garante que as etiquetas (badges) quebrem a linha corretamente */
+        .select2-selection--multiple {
+            overflow: hidden !important;
+            height: auto !important;
+        }
+
+        /* Ajuste específico para o tema Bootstrap 5 que você está usando */
+        .select2-container--bootstrap-5 {
+            width: 100% !important;
+        }
+        /* Correção para Select2 dentro de input-group do Bootstrap 5 */
+        .input-group > .select2-container--bootstrap-5 {
+            flex: 1 1 auto !important; /* Faz o campo crescer e ocupar o espaço restante */
+            width: 1% !important;      /* Truque do Bootstrap para alinhar elementos no grupo */
+        }
+
+        .input-group > .select2-container--bootstrap-5 .select2-selection {
+            border-top-right-radius: 0 !important;    /* Remove o arredondamento que encosta no botão */
+            border-bottom-right-radius: 0 !important;
+        }
+
+        /* Remove o visual pesado da paginação padrão */
+        .pagination .page-link {
+            background: transparent;
+            color: #04357b;
+            transition: all 0.3s ease;
+            padding: 8px 12px;
+        }
+
+        /* Estiliza o botão da página ativa (o antigo quadrado azul) */
+        .pagination .page-item.active .page-link {
+            background-color: #04357b !important;
+            border-color: #04357b !important;
+            color: white !important;
+            font-weight: bold;
+        }
+
+        /* Efeito de hover suave nos botões de anterior/próximo */
+        .pagination .page-link:hover:not(.active) {
+            background-color: #f8f9fa;
+            color: #002350;
+            border-radius: 8px;
+        }
+
+        /* Ajuste para o texto de contagem */
+        .text-muted.small b {
+            color: #04357b;
+        }
+
     </style>
 </head>
 
@@ -293,7 +398,15 @@
     </div>
 
     <div class="main-wrapper">
-        
+        <div class="mobile-header d-md-none d-flex align-items-center justify-content-between p-2 bg-dark text-white border-bottom border-secondary">
+            <button class="btn text-white" type="button" id="mobileMenuBtn">
+                <i class="fas fa-bars fa-lg"></i>
+            </button>
+            <div class="mobile-logo-text">
+                <span class="fw-bold">SGDP</span>
+            </div>
+            <div style="width: 40px;"></div> </div>
+
         <nav id="sidebar">
             
             <button type="button" id="sidebarCollapse" title="Minimizar/Maximizar Menu">
@@ -317,7 +430,7 @@
                 {% if user.is_superuser or 'Protocolo' in user.groups.all|join:',' or 'Protocolador-Chefe' in user.groups.all|join:', ' %}
                     <li class="nav-item">
                         <a href="{% url 'gestao:distribuicao' %}" class="nav-link {% if request.resolver_match.url_name == 'distribuicao' %}active{% endif %}" title="Aguardando Distribuição">
-                            <i class="fas fa-arrow-circle-right fa-fw me-2"></i><span class="link-text">Distribuição Pendente</span>
+                            <i class="fas fa-arrow-circle-right fa-fw me-2"></i><span class="link-text">Distribuição</span>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -326,11 +439,19 @@
                         </a>
                     </li>
                 {% endif %}
+                
+                {% if user.is_superuser or 'Protocolador-Chefe' in user.groups.all|join:', ' or 'Procurador-Chefe' in user.groups.all|join:',' %}
+                    <li class="nav-item">
+                        <a href="{% url 'gestao:diligencias' %}" class="nav-link {% if request.resolver_match.url_name == 'diligencias' %}active{% endif %}" title="Diligências Pendentes">
+                            <i class="fas fa-gavel fa-fw me-2"></i><span class="link-text">Diligências</span>
+                        </a>
+                    </li>
+                {% endif %}
 
                 {% if user.is_superuser or 'Procuradores' in user.groups.all|join:',' or 'Procurador-Chefe' in user.groups.all|join:',' or 'Procurador-Analista' in user.groups.all|join:',' %}
                     <li class="nav-item">
                         <a href="{% url 'gestao:procurador_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'procurador_dashboard' %}active{% endif %}" title="Processos Pendentes">
-                            <i class="fas fa-inbox fa-fw me-2"></i><span class="link-text">Processos Pendentes</span>
+                            <i class="fas fa-inbox fa-fw me-2"></i><span class="link-text">Processos</span>
                         </a>
                     </li>
                 {% endif %}
@@ -356,6 +477,9 @@
                         </a>
                     </li>
                 {% endif %}
+
+
+
             </ul>
             
             <hr style="border-top: 1px solid #495057; margin: 15px;">
@@ -490,6 +614,44 @@
                 });
             });
         });
+
+        // Script para o Menu Mobile
+        document.addEventListener("DOMContentLoaded", function() {
+            const mobileBtn = document.getElementById('mobileMenuBtn');
+            const sidebar = document.getElementById('sidebar');
+            
+            // Cria o overlay dinamicamente se não existir
+            let overlay = document.querySelector('.sidebar-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'sidebar-overlay';
+                document.body.appendChild(overlay);
+            }
+
+            if (mobileBtn) {
+                mobileBtn.addEventListener('click', function() {
+                    sidebar.classList.add('show-mobile');
+                    overlay.classList.add('active');
+                });
+            }
+
+            // Fecha o menu ao clicar no overlay ou em um link
+            overlay.addEventListener('click', function() {
+                sidebar.classList.remove('show-mobile');
+                overlay.classList.remove('active');
+            });
+
+            // Se clicar em um link no mobile, fecha o menu
+            sidebar.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth < 768) {
+                        sidebar.classList.remove('show-mobile');
+                        overlay.classList.remove('active');
+                    }
+                });
+            });
+        });
     </script>
+
 </body>
 </html>

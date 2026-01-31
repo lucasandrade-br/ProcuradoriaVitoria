@@ -4,15 +4,22 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.hashers import make_password, check_password
-from .models import Documento, Anexo, Remetente
+from .models import Documento, Anexo, HistoricoEdicao, Remetente, SolicitacaoDocumento
 from django.http import JsonResponse
-from .forms import DocumentoForm, AnexoFormSet, AnexoForm, FinalizacaoForm, DocumentoFilterForm, RemetenteForm, PinForm
+from .forms import DocumentoForm, AnexoFormSet, AnexoForm, FinalizacaoForm, DocumentoFilterForm, RemetenteForm, PinForm, DocumentoUpdateForm, AnexoUpdateFormSet
 from django.utils import timezone
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import Max, Q
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMessage, send_mail, EmailMultiAlternatives
 from django.conf import settings
+from django.core.paginator import Paginator
+from django.urls import reverse
+from datetime import datetime
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.db import transaction
+from .email_utils import enviar_email_html
 
 logger = logging.getLogger('gestao')
 
@@ -28,7 +35,7 @@ def dashboard_view(request):
     
     # Total de docs que estão com procuradores (para monitorar)
     total_para_monitorar = Documento.objects.filter(
-        status__in=['Em Análise', 'Análise Concluída', 'Rejeitado']
+        status__in=['Em Análise', 'Análise Concluída', 'Rejeitado', 'Em Diligência']
     ).count()
     
     # Total de docs que aguardam a confirmação final do Analista/Chefe
@@ -38,10 +45,13 @@ def dashboard_view(request):
     
     # Total de docs pendentes para o PROCURADOR logado (para o card dele)
     total_pendente_procurador = Documento.objects.filter(
-        status__in=['Em Análise', 'Rejeitado'],
+        status__in=['Em Análise', 'Rejeitado', 'Em Diligência'],
         procurador_atribuido=request.user
     ).count()
 
+    total_diligencias_pendentes = SolicitacaoDocumento.objects.filter(
+        status='Pendente' # Ou o status que representa "aguardando gestão"
+    ).count()
 
     # 2. Preparar os dados para enviar ao HTML
     context = {
@@ -49,6 +59,7 @@ def dashboard_view(request):
         'total_para_monitorar': total_para_monitorar,
         'total_para_confirmar': total_para_confirmar,
         'total_pendente_procurador': total_pendente_procurador,
+        'total_diligencias_pendentes': total_diligencias_pendentes,
     }
 
     # 3. Renderizar a página
@@ -66,51 +77,53 @@ def documento_create_view(request):
     
     # Lógica POST: Processa o formulário principal E o formset
     if request.method == 'POST':
-        # Instancia o form principal com dados POST
         documento_form = DocumentoForm(request.POST) 
-        # Instancia o formset com dados POST e FILES
-        anexo_formset = AnexoFormSet(request.POST, request.FILES) 
+        # Instancia com o prefixo aqui
+        anexo_formset = AnexoFormSet(request.POST, request.FILES, prefix='anexos') 
 
-        # Valida ambos
         if documento_form.is_valid() and anexo_formset.is_valid():
-            
-            # Salva o Documento principal (commit=False)
-            documento = documento_form.save(commit=False)
-            documento.protocolado_por = request.user
-            documento.save() # Salva o documento para ter um ID
+            tem_anexo = any(form.cleaned_data.get('arquivo') for form in anexo_formset.forms 
+                            if form.cleaned_data and not form.cleaned_data.get('DELETE', False))
 
-            # Agora, salva o formset, LIGANDO-O ao documento recém-criado
-            # Passamos 'instance=documento' para fazer a ligação
-            anexo_formset.instance = documento
-            
-            # Precisamos iterar e salvar cada anexo individualmente
-            # para definir o usuario_upload
-            anexos_salvos = anexo_formset.save(commit=False) # Pega os objetos Anexo
-            for anexo in anexos_salvos:
-                anexo.usuario_upload = request.user
-                anexo.tipo_anexo = 'INICIAL' # Define o tipo
-                anexo.save() # Salva cada anexo no banco
+            if not tem_anexo:
+                messages.error(request, "É obrigatório anexar pelo menos um documento.")
+            else:
+                try:
+                    with transaction.atomic():
+                        documento = documento_form.save(commit=False)
+                        documento.protocolado_por = request.user
+                        documento.save() 
+                        documento_form.save_m2m() 
 
-            # Salva a relação ManyToMany (se houvesse) - boa prática incluir
-            anexo_formset.save_m2m() 
+                        anexo_formset.instance = documento
+                        anexos_salvos = anexo_formset.save(commit=False) 
+                        for anexo in anexos_salvos:
+                            anexo.usuario_upload = request.user
+                            anexo.tipo_anexo = 'INICIAL'
+                            anexo.save() 
 
-            #messages.success(request, f"Documento {documento.protocolo} cadastrado com sucesso!")
-            return redirect('gestao:documento_confirmacao', pk=documento.pk)
+                        anexo_formset.save_m2m()
+                        
+                        # IMPORTANTE: Você precisa retornar o redirect aqui dentro do sucesso!
+                        return redirect('gestao:documento_confirmacao', pk=documento.pk)
+
+                except Exception as e:
+                    messages.error(request, f"Erro crítico ao salvar: {str(e)}")
         else:
-            # Se algum formulário for inválido, exibe mensagens de erro
             messages.error(request, "Erro ao cadastrar o documento. Verifique os campos.")
 
-    # Lógica GET: Mostra os formulários vazios
     else:
+        # Lógica GET: Instancia o formset vazio com o prefixo
         documento_form = DocumentoForm()
-        # Cria um formset vazio
-        anexo_formset = AnexoFormSet()
+        anexo_formset = AnexoFormSet(prefix='anexos') # Defina o prefixo aqui
 
+    # Contexto limpo: Apenas passa as variáveis já instanciadas
     context = {
         'documento_form': documento_form,
-        'anexo_formset': anexo_formset # Envia o FORMSET para o template
+        'anexo_formset': anexo_formset 
     }
     
+
     return render(request, 'gestao/documento_form.html', context)
 
 
@@ -120,7 +133,7 @@ def distribuicao_view(request):
     is_protocolo = request.user.groups.filter(name='Protocolo').exists()
     if not request.user.is_superuser and not is_protocolo_chefe and not is_protocolo:
         raise PermissionDenied("Você não tem permissão para distribuir documentos.")
-    # --- FIM DA VERIFICAÇÃO ---
+    
     # --- LÓGICA DE ATRIBUIÇÃO (POST) ---
     if request.method == 'POST':
         documentos_ids = request.POST.getlist('documento_selecionado')
@@ -208,7 +221,7 @@ def distribuicao_view(request):
     ).select_related( # Otimização para ForeignKey
         'remetente', 'procurador_atribuido', 'prioridade', 'tipo_documento' 
     ).prefetch_related( # OTIMIZAÇÃO: Busca os anexos eficientemente
-        'anexos' 
+        'anexos', 'interessados'
     ).order_by('data_recebimento')
 
     # 2. Busca a lista de usuários que pertencem ao grupo "Procuradores" (ativos)
@@ -273,12 +286,17 @@ def distribuicao_view(request):
 @login_required
 def procurador_dashboard_view(request):
     
-    # --- A MÁGICA ESTÁ AQUI ---
-    # 1. A Lógica: Buscamos todos os documentos...
+    # --- OTIMIZAÇÃO PARA PERFORMANCE MÁXIMA ---
+    # 1. Buscamos os documentos otimizando o acesso ao banco
     lista_de_documentos = Documento.objects.filter(
-        status__in=['Em Análise', 'Rejeitado'], # ...cujo status seja 'Em Análise' ou 'Rejeitado'
-        procurador_atribuido=request.user # ...E que estejam atribuídos AO USUÁRIO LOGADO!
-    ).order_by('data_limite') # ...ordenados pelo prazo mais apertado
+        status__in=['Em Análise', 'Rejeitado', 'Em Diligência'],
+        procurador_atribuido=request.user
+    ).select_related(
+        'tipo_documento', 
+        'prioridade'
+    ).prefetch_related(
+        'interessados' # <--- OBRIGATÓRIO para a nova tabela com badges
+    ).order_by('data_limite')
     
     # 2. O Contexto
     context = {
@@ -328,9 +346,32 @@ def documento_detail_view(request, pk):
              messages.error(request, "Você não tem permissão para realizar esta ação.")
              return redirect('gestao:documento_detail', pk=documento.pk)
 
+        # 1. Lógica para SOLICITAR DILIGÊNCIA (Aba 5)
+        if 'submit_diligencia' in request.POST:
+            descricao = request.POST.get('descricao_necessidade')
+            
+            if descricao:
+                # Cria o registro da solicitação
+                SolicitacaoDocumento.objects.create(
+                    documento=documento,
+                    procurador=request.user,
+                    descricao_necessidade=descricao,
+                    status='Pendente'
+                )
+                
+                # MUDANÇA DE STATUS: O processo sai da fila "ativa" do procurador
+                documento.status = 'Em Diligência'
+                documento.save()
+                
+                messages.success(request, "Solicitação de documentos enviada com sucesso à Chefia.")
+                return redirect('gestao:documento_detail', pk=pk)
+            else:
+                messages.error(request, "Você precisa descrever o que está faltando.")
+
+
         # --- AÇÃO 1: APENAS ANEXAR ---
         # (Verifica se o botão 'submit_anexar' foi pressionado - nome do template)
-        if 'submit_anexar' in request.POST:
+        elif 'submit_anexar' in request.POST:
             anexo_form = AnexoForm(request.POST, request.FILES)
             if anexo_form.is_valid():
                 anexo = anexo_form.save(commit=False)
@@ -343,11 +384,20 @@ def documento_detail_view(request, pk):
                 return redirect('gestao:documento_detail', pk=documento.pk)
             else:
                 messages.error(request, "Erro ao anexar arquivo. Verifique se selecionou um arquivo válido.")
-                # (A view continuará para o GET e mostrará o anexo_form com erros)
-
+                
         # --- AÇÃO 2: CONCLUIR ANÁLISE ---
         # (Verifica se o botão 'submit_concluir' foi pressionado - nome do template)
         elif 'submit_concluir' in request.POST:
+            # 1. TRAVA DE DILIGÊNCIAS: Verifica se há solicitações que não foram finalizadas
+            # Filtra por 'Pendente' ou 'Enviada'
+            diligencias_ativas = documento.solicitacoes.filter(status__in=['Pendente', 'Enviada']).exists()
+            
+            if diligencias_ativas:
+                messages.error(
+                    request, 
+                    "Não é possível concluir: este processo possui diligências pendentes ou enviadas que ainda não foram resolvidas."
+                )
+                return redirect('gestao:documento_detail', pk=documento.pk)
             # Verifica se há pelo menos uma resposta ativa antes de concluir
             if not documento.anexos.filter(tipo_anexo='RESPOSTA', ativo=True).exists():
                  messages.error(request, "Você deve anexar pelo menos um parecer antes de concluir.")
@@ -377,55 +427,56 @@ def documento_detail_view(request, pk):
         'documento': documento,
         'anexos_iniciais': anexos_iniciais,
         'anexos_resposta': anexos_resposta, # Envia a lista de respostas
-        'anexo_form': anexo_form
+        'anexo_form': anexo_form,
+        'solicitacoes': documento.solicitacoes.all().order_by('-data_solicitacao'),
     }
     
     return render(request, 'gestao/documento_detail.html', context)
 
-
 @login_required
-def monitoramento_analises_view(request): # <-- RENOMEADA
+def monitoramento_analises_view(request):
+    # Verificação de permissões (Mantida como está, está correta)
     is_protocolo_chefe = request.user.groups.filter(name='Protocolador-Chefe').exists()
     is_protocolo = request.user.groups.filter(name='Protocolo').exists()
     if not request.user.is_superuser and not is_protocolo_chefe and not is_protocolo:
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
 
-
-    # 1. A Lógica: Buscamos documentos 'Em Análise' OU 'Análise Concluída'
+    # 1. A Lógica Otimizada:
     lista_de_documentos = Documento.objects.filter(
-        status__in=['Em Análise', 'Análise Concluída', 'Rejeitado']
-    ).order_by('data_limite') # Ordena pelo prazo mais próximo
+        status__in=['Em Análise', 'Análise Concluída', 'Rejeitado', 'Em Diligência']
+    ).select_related(
+        'tipo_documento', 
+        'prioridade', 
+        'procurador_atribuido'
+    ).prefetch_related(
+        'interessados'  # <--- CRUCIAL para a tabela que você alterou!
+    ).order_by('data_limite')
 
     # 2. O Contexto
     context = {
         'documentos': lista_de_documentos
     }
 
-    # 3. Renderizar o NOVO template (que vamos renomear/criar)
-    return render(request, 'gestao/monitoramento_analises.html', context) 
+    # 3. Renderizar
+    return render(request, 'gestao/monitoramento_analises.html', context)
 
 
 
 @login_required
 def finalizacao_detail_view(request, pk):
-    # Verificação de permissão de acesso (GET) - (Já implementada na Etapa 2)
+    # Verificação de permissão de acesso (GET)
     is_protocolo_chefe = request.user.groups.filter(name='Protocolador-Chefe').exists()
     is_protocolo = request.user.groups.filter(name='Protocolo').exists()
     if not request.user.is_superuser and not is_protocolo_chefe and not is_protocolo:
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
     
     documento = get_object_or_404(Documento, pk=pk)
-    
-    # --- NOVA LÓGICA DE PERMISSÃO DE AÇÃO ---
-    # Define se o usuário pode arquivar diretamente (pular etapa de confirmação)
     pode_arquivar_direto = is_protocolo_chefe or request.user.is_superuser
-    # --- FIM DA LÓGICA ---
 
     # Instanciamos os formulários FORA do if/else para reuso
     finalizacao_form = FinalizacaoForm(request.POST or None, instance=documento)
     anexo_form = AnexoForm(request.POST or None, request.FILES or None)
 
-    # --- LÓGICA POST (MUITO MODIFICADA) ---
     if request.method == 'POST':
         
         # --- AÇÃO 1: Anexar Parecer (igual a antes) ---
@@ -443,6 +494,10 @@ def finalizacao_detail_view(request, pk):
 
         # --- AÇÃO 2: Enviar para Conclusão ---
         elif 'submit_enviar_conclusao' in request.POST:
+            if documento.solicitacoes.filter(status__in=['Pendente', 'Enviada']).exists():
+                messages.error(request, "Impossível prosseguir: Existem diligências pendentes ou enviadas que ainda não foram resolvidas.")
+                return redirect('gestao:finalizacao_detail', pk=documento.pk)
+            
             if not documento.anexos.filter(tipo_anexo='RESPOSTA', ativo=True).exists():
                 messages.error(request, "Impossível prosseguir: Nenhum parecer/resposta foi anexado a este processo.")
                 return redirect('gestao:finalizacao_detail', pk=documento.pk)
@@ -451,7 +506,6 @@ def finalizacao_detail_view(request, pk):
             if finalizacao_form.is_valid():
                 documento_salvo = finalizacao_form.save(commit=False)
                 documento_salvo.status = 'Aguardando Confirmação' # <-- NOVO STATUS
-                # Limpa campos de finalização, pois ainda não está finalizado
                 documento_salvo.data_finalizacao = None
                 documento_salvo.finalizado_por = None
                 documento_salvo.save()
@@ -467,12 +521,15 @@ def finalizacao_detail_view(request, pk):
             if not pode_arquivar_direto:
                 raise PermissionDenied
             
+            if documento.solicitacoes.filter(status__in=['Pendente', 'Enviada']).exists():
+                messages.error(request, "Impossível arquivar: Existem diligências em aberto (pendentes ou enviadas).")
+                return redirect('gestao:finalizacao_detail', pk=documento.pk)
+            
             if not documento.anexos.filter(tipo_anexo='RESPOSTA', ativo=True).exists():
                 messages.error(request, "Impossível arquivar: Nenhum parecer/resposta foi anexado a este processo.")
                 return redirect('gestao:finalizacao_detail', pk=documento.pk)
 
             if finalizacao_form.is_valid():
-                
                 # O form salva a 'obs_finalizacao'
                 documento_salvo = finalizacao_form.save(commit=False) 
                 documento_salvo.status = 'Finalizado' # <-- STATUS FINAL
@@ -480,55 +537,61 @@ def finalizacao_detail_view(request, pk):
                 documento_salvo.finalizado_por = request.user
                 documento_salvo.save()
                 
-                # --- LÓGICA DE ENVIO DE E-MAIL (Movida para cá) ---
+                # --- LÓGICA DE ENVIO DE E-MAIL (REFATORADA PARA MÚLTIPLOS DESTINATÁRIOS) ---
                 email_enviado_sucesso = False
                 try:
                     from .email_utils import enviar_email_html
                     
-                    email_remetente = documento.remetente.email
-                    if email_remetente:
+                    # 1. Monta a lista de destinatários (Interessados + Opcional Remetente)
+                    destinatarios = [i.email for i in documento.interessados.all() if i.email] #
+                    
+                    if documento.notificar_remetente and documento.remetente.email: #
+                        destinatarios.append(documento.remetente.email) #
+
+                    # Só prossegue se houver pelo menos um e-mail na lista
+                    if destinatarios:
                         contexto = {
-                            'remetente_nome': documento.remetente.nome_razao_social,
+                            # Dica: No template, você pode mudar 'remetente_nome' para algo mais genérico
+                            'remetente_nome': "Interessados", 
                             'protocolo': documento.protocolo,
                             'num_doc_origem': documento.num_doc_origem,
                             'data_finalizacao': documento.data_finalizacao.strftime('%d/%m/%Y %H:%M') if documento.data_finalizacao else timezone.now().strftime('%d/%m/%Y %H:%M'),
                             'observacoes_finalizacao': documento.obs_finalizacao,
                         }
                         
+                        # Lógica de anexos permanece a mesma (Muito boa por sinal!)
                         anexos_paths = []
-                        for anexo in documento.anexos.filter(tipo_anexo='INICIAL', ativo=True):
-                            if os.path.exists(anexo.arquivo.path):
-                                anexos_paths.append(anexo.arquivo.path)
-                        for anexo in documento.anexos.filter(tipo_anexo='RESPOSTA', ativo=True):
+                        for anexo in documento.anexos.filter(tipo_anexo__in=['INICIAL', 'RESPOSTA'], ativo=True):
                             if os.path.exists(anexo.arquivo.path):
                                 anexos_paths.append(anexo.arquivo.path)
                         
                         assunto = f"Resposta ao Documento Protocolo {documento.protocolo} - Procuradoria"
+                        
+                        # Enviamos para a LISTA completa
                         email_enviado_sucesso = enviar_email_html(
                             assunto=assunto,
                             template_name='emails/resposta_remetente.html',
                             contexto=contexto,
-                            destinatarios=[email_remetente],
+                            destinatarios=destinatarios, # Passa a lista aqui
                             anexos=anexos_paths
                         )
                         
                         if email_enviado_sucesso:
-                            logger.info(f"E-mail de resposta enviado para {email_remetente} - Documento {documento.protocolo}")
+                            logger.info(f"E-mail enviado para {destinatarios} - Doc {documento.protocolo}")
                     else:
-                        logger.info(f"Doc {documento.protocolo} finalizado sem e-mail (remetente sem e-mail).")
+                        logger.info(f"Doc {documento.protocolo} finalizado sem e-mails válidos na lista de interessados.")
                         
                 except Exception as e:
                     logger.error(f"Erro ao enviar e-mail de resposta do documento {documento.protocolo}: {e}")
                     messages.error(request, f"Documento arquivado, mas falha ao enviar e-mail: {e}")
-                
+
                 if email_enviado_sucesso:
-                    messages.success(request, f"Documento {documento.protocolo} arquivado e e-mail enviado ao remetente!")
+                    messages.success(request, f"Documento {documento.protocolo} arquivado e e-mails enviados aos interessados!")
                 else:
-                    messages.success(request, f"Documento {documento.protocolo} arquivado com sucesso! (E-mail não enviado).")
-                
+                    messages.success(request, f"Documento {documento.protocolo} arquivado com sucesso! (Nenhum e-mail enviado).")
                 return redirect('gestao:monitoramento_analises')
             else:
-                 messages.error(request, "Erro ao arquivar. Verifique se TODOS os registros estão corretos - Descrição Final também é obrigatória.")
+                messages.error(request, "Erro ao arquivar. Verifique se TODOS os registros estão corretos - Descrição Final também é obrigatória.")
 
     # --- LÓGICA GET (Continua buscando os dados) ---
     anexos_iniciais = documento.anexos.filter(tipo_anexo='INICIAL', ativo=True)
@@ -549,81 +612,102 @@ def finalizacao_detail_view(request, pk):
 
 @login_required
 def busca_view(request):
-    
-    # 1. Inicia o formulário com os dados da URL (request.GET)
+    # 1. Inicia o formulário com os dados da URL
     form = DocumentoFilterForm(request.GET or None)
     
+    # --- OTIMIZAÇÃO DE PERFORMANCE (SELECT E PREFETCH) ---
+    # Já iniciamos o queryset trazendo tudo o que a tabela precisa
+    queryset = Documento.objects.select_related(
+        'tipo_documento', 
+        'prioridade', 
+    ).prefetch_related(
+        'interessados' # <--- Essencial para as badges na tabela
+    )
+
+    # 2. Lógica de Permissão (Filtro de visibilidade)
     is_protocolo_chefe = request.user.groups.filter(name='Protocolador-Chefe').exists()
     is_protocolo = request.user.groups.filter(name='Protocolo').exists()
     is_procurador_chefe = request.user.groups.filter(name='Procurador-Chefe').exists()
 
-    # Se for Superuser, Protocolo, Chefe de Protocolo ou Chefe Procurador, vê TUDO.
-    if request.user.is_superuser or is_protocolo or is_protocolo_chefe or is_procurador_chefe:
-        queryset = Documento.objects.all()
-    else: 
-        # Caso contrário (Procurador ou Analista padrão), vê APENAS os seus.
-        queryset = Documento.objects.filter(procurador_atribuido=request.user)
+    # Se não for um dos perfis "mestre", vê apenas os seus processos
+    if not (request.user.is_superuser or is_protocolo or is_protocolo_chefe or is_procurador_chefe):
+        queryset = queryset.filter(procurador_atribuido=request.user)
 
-    # 3. Verifica se o formulário é válido (ele sempre será,
-    #    pois os campos não são obrigatórios)
+    # 3. Aplicação dos Filtros Dinâmicos
     if form.is_valid():
-        # Pega os dados "limpos" do formulário
         protocolo = form.cleaned_data.get('protocolo')
-        remetente = form.cleaned_data.get('remetente')
+        tipo_documento = form.cleaned_data.get('tipo_documento')
+        interessados = form.cleaned_data.get('interessados')
         status = form.cleaned_data.get('status')
         data_inicio = form.cleaned_data.get('data_inicio')
         data_fim = form.cleaned_data.get('data_fim')
         
-        # 4. APLICA OS FILTROS DINAMICAMENTE
-        # A cada 'if' verdadeiro, a consulta ao banco vai se afunilando
-        
         if protocolo:
-            # __icontains = "contém, ignorando maiúsculas/minúsculas"
             queryset = queryset.filter(protocolo__icontains=protocolo)
         
-        if remetente:
-            queryset = queryset.filter(remetente=remetente)
+        # ALTERADO: Agora filtra pela relação ManyToMany de Interessados
+        if interessados:
+            queryset = queryset.filter(interessados=interessados).distinct()
             
         if status:
             queryset = queryset.filter(status=status)
             
         if data_inicio:
-            # __date__gte = "a data é maior ou igual a"
             queryset = queryset.filter(data_recebimento__date__gte=data_inicio)
             
         if data_fim:
-            # __date__lte = "a data é menor ou igual a"
             queryset = queryset.filter(data_recebimento__date__lte=data_fim)
+        if tipo_documento:
+            queryset =queryset.filter(tipo_documento=tipo_documento)
 
+    # 4. Lógica de Ordenação
     ordenar_por = request.GET.get('ordenar_por', 'data_recebimento')
     ordem = request.GET.get('ordem', 'desc')
-
-    # Define o prefixo para ordenação decrescente (desc)
     prefixo = '-' if ordem == 'desc' else ''
     
-    # Aplica a ordenação ao queryset
-    # (Adicionamos 'id' como segundo critério para garantir ordem estável em empates)
+    # Adicionamos 'id' como desempate para evitar instabilidade na paginação
     queryset = queryset.order_by(f'{prefixo}{ordenar_por}', f'{prefixo}id')
-    # --- FIM DA LÓGICA DE ORDENAÇÃO ---
 
-    # 5. Prepara o contexto para o template
+    # 5. Contexto para o template
     context = {
         'filter_form': form,
-        'documentos': queryset, # A queryset já está ordenada acima
-        'ordenar_por_atual': ordenar_por, # Para o template saber qual está ativa
-        'ordem_atual': ordem,             # Para o template saber a direção atual
+        'documentos': queryset,
+        'ordenar_por_atual': ordenar_por,
+        'ordem_atual': ordem,
     }
     
-    # 6. Renderiza a página
-    # O nosso template 'busca.html' é inteligente:
-    # Ele só mostrará os resultados se houver um 'request.GET',
-    # caso contrário, mostrará a mensagem "Use os filtros...".
+    # --- INÍCIO DA LÓGICA DE PAGINAÇÃO ---
+    itens_por_pagina = 25 # Defina quantos processos quer ver por vez
+    paginator = Paginator(queryset, itens_por_pagina)
+    
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    # ---------------------------------------
+
+    # Truque de Mestre: Mantendo os filtros na URL da paginação
+    # Isso evita que ao clicar na pág 2, o sistema esqueça o filtro de "Interessados"
+    query_params = request.GET.copy()
+    if 'page' in query_params:
+        del query_params['page']
+    url_params = query_params.urlencode()
+
+    context = {
+        'filter_form': form,
+        'documentos': page_obj, # IMPORTANTE: Passamos o objeto da página, não o queryset todo
+        'ordenar_por_atual': ordenar_por,
+        'ordem_atual': ordem,
+        'url_params': url_params, # Para usar nos links de página
+    }
+
+
     return render(request, 'gestao/busca.html', context)
 
 
 @login_required
 def documento_consulta_view(request, pk):
     documento = get_object_or_404(Documento, pk=pk)
+    origem = request.GET.get('origem', 'busca')
+    procuradores = User.objects.filter(groups__name='Procuradores').order_by('first_name')
 
     is_protocolo_chefe = request.user.groups.filter(name='Protocolador-Chefe').exists()
     is_protocolo = request.user.groups.filter(name='Protocolo').exists()
@@ -665,7 +749,9 @@ def documento_consulta_view(request, pk):
         'anexos_iniciais': anexos_iniciais,
         'anexos_resposta': anexos_resposta,
         'tempo_resposta': tempo_resposta, 
-        'pode_reativar': pode_reativar, # <-- PASSA A PERMISSÃO PARA O TEMPLATE
+        'pode_reativar': pode_reativar,
+        'origem': origem,
+        'procuradores': procuradores,
     }
 
     return render(request, 'gestao/documento_consulta.html', context)
@@ -903,19 +989,25 @@ def enviar_lembrete_view(request, pk):
 
 @login_required
 def confirmacao_lista_view(request):
-    
-    # --- LÓGICA DE PERMISSÃO ---
-    # Apenas Procurador-Analista, Procurador-Chefe ou Superusuários podem ver esta lista
+    # --- LÓGICA DE PERMISSÃO (Mantida - está correta) ---
     is_procurador_analista = request.user.groups.filter(name='Procurador-Analista').exists()
     is_procurador_chefe = request.user.groups.filter(name='Procurador-Chefe').exists()
+    
     if not is_procurador_analista and not is_procurador_chefe and not request.user.is_superuser:
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
-    # --- FIM DA LÓGICA DE PERMISSÃO ---
 
-    # 1. A Lógica: Buscamos todos os documentos...
+    # 1. A Lógica Otimizada:
+    # Usamos select_related para as chaves estrangeiras e prefetch_related para os interessados
     lista_de_documentos = Documento.objects.filter(
-        status='Aguardando Confirmação'  # ...cujo status seja 'Aguardando Confirmação'
-    ).order_by('data_resposta_procurador') # Ordena pelos respondidos há mais tempo
+        status='Aguardando Confirmação'
+    ).select_related(
+        'remetente', 
+        'tipo_documento', 
+        'prioridade',
+        'procurador_atribuido' # Importante para saber quem respondeu
+    ).prefetch_related(
+        'interessados' # <--- O segredo para a tabela não travar
+    ).order_by('data_resposta_procurador')
 
     # 2. O Contexto
     context = {
@@ -1193,3 +1285,251 @@ def excluir_anexo_view(request, pk, anexo_id):
     # Usamos request.META.get('HTTP_REFERER') para tentar voltar para a página anterior inteligente,
     # ou fixamos uma página padrão se não conseguir.
     return redirect(request.META.get('HTTP_REFERER') or 'gestao:dashboard')
+
+@login_required
+def documento_update_view(request, pk):
+    documento = get_object_or_404(Documento, pk=pk)
+    origem = request.GET.get('origem') or request.POST.get('origem') or 'busca'
+    voltar_para = request.GET.get('voltar_para') or request.POST.get('voltar_para') or 'consulta'
+
+    # REGRA 1: Imutabilidade de processos finalizados
+    if documento.status == 'Finalizado':
+        messages.error(request, "Processos finalizados não podem ser alterados.")
+        url_destino = reverse('gestao:documento_consulta', kwargs={'pk': pk})
+        return redirect(f"{url_destino}?origem={origem}")
+
+    # REGRA 2: Apenas Chefias e Admins
+    is_chefia = request.user.groups.filter(name__in=['Protocolador-Chefe', 'Procurador-Chefe']).exists()
+    if not (request.user.is_superuser or is_chefia):
+        raise PermissionDenied("Acesso restrito à chefia.")
+
+    if request.method == 'POST':
+        form = DocumentoUpdateForm(request.POST, instance=documento)
+        formset = AnexoUpdateFormSet(request.POST, request.FILES, instance=documento)
+
+        if form.is_valid() and formset.is_valid():
+            
+            # --- 1. LOG DE ALTERAÇÕES (CAMPOS DO DOCUMENTO) ---
+            # Fazemos antes de salvar para comparar o valor antigo com o novo
+            for campo in form.changed_data:
+                valor_antigo = getattr(documento, campo)
+                valor_novo = form.cleaned_data[campo]
+                
+                HistoricoEdicao.objects.create(
+                    documento=documento,
+                    usuario=request.user,
+                    campo_alterado=campo.replace('_', ' ').capitalize(),
+                    valor_antigo=str(valor_antigo),
+                    valor_novo=str(valor_novo)
+                )
+
+            # --- 2. SALVAR DOCUMENTO PRINCIPAL ---
+            # Isso já salva os campos e os Interessados (M2M) automaticamente
+            form.save()
+
+            # --- 3. SALVAR NOVOS ANEXOS (OU EDITADOS) ---
+            # Usamos commit=False para injetar o usuário logado e evitar o IntegrityError
+            anexos = formset.save(commit=False)
+            for anexo in anexos:
+                anexo.usuario_upload = request.user  # <--- Resolve o erro de Column cannot be null
+                anexo.save()
+
+            # --- 4. LOG E INATIVAÇÃO DE ANEXOS ---
+            # Tratamos os anexos que o usuário marcou para remover
+            for anexo_para_inativar in formset.deleted_objects:
+                # Registra no log antes de mudar
+                HistoricoEdicao.objects.create(
+                    documento=documento,
+                    usuario=request.user,
+                    campo_alterado="Anexo",
+                    valor_antigo=f"Arquivo: {anexo_para_inativar.arquivo.name}",
+                    valor_novo="Inativado pelo usuário"
+                )
+                # Em vez de deletar do banco, apenas inativamos
+                anexo_para_inativar.ativo = False
+                anexo_para_inativar.save()
+
+            messages.success(request, f"Processo {documento.protocolo} atualizado com sucesso.")
+            # DECISÃO DE REDIRECIONAMENTO
+            if voltar_para == 'finalizacao':
+                url_nome = 'gestao:finalizacao_detail' # Ajuste para o nome real da sua rota
+            else:
+                url_nome = 'gestao:documento_consulta'
+
+            url_destino = reverse(url_nome, kwargs={'pk': pk})
+            return redirect(f"{url_destino}?origem={origem}")
+    else:
+        form = DocumentoUpdateForm(instance=documento)
+        formset = AnexoUpdateFormSet(instance=documento)
+
+    return render(request, 'gestao/documento_update.html', {
+        'form': form,
+        'formset': formset,
+        'documento': documento,
+        'anexos_iniciais': documento.anexos.filter(ativo=True),
+        'origem': origem,
+        'voltar_para': voltar_para,
+    })
+
+@login_required
+def diligencias_pendentes_view(request):
+    # Apenas Chefias e Admins acessam esta central de controle
+    is_chefia = request.user.groups.filter(name__in=['Protocolador-Chefe', 'Procurador-Chefe']).exists()
+    if not (request.user.is_superuser or is_chefia):
+        raise PermissionDenied("Acesso restrito à gestão de diligências.")
+
+    # Filtra conforme solicitado: Pendentes (novas) e Enviadas (aguardando remetente)
+    solicitacoes = SolicitacaoDocumento.objects.filter(
+        status__in=['Pendente', 'Enviada']
+    ).select_related('documento', 'procurador').order_by('-data_solicitacao')
+
+    return render(request, 'gestao/diligencias_pendentes.html', {
+        'solicitacoes': solicitacoes,
+        'total_pendentes': solicitacoes.filter(status='Pendente').count()
+    })
+
+@login_required
+def decidir_diligencia_view(request, diligencia_id):
+    diligencia = get_object_or_404(SolicitacaoDocumento, id=diligencia_id)
+    documento = diligencia.documento
+    
+    if request.method == 'POST':
+        acao = request.POST.get('acao_gestao')
+        
+        # Atribuímos o usuário e a data antes de entrar nos IFs
+        diligencia.analisado_por = request.user
+        diligencia.data_resposta = timezone.now()
+
+        if acao == 'enviar_email':
+            texto_email = request.POST.get('texto_decisao')
+            email_destino = request.POST.get('email_destino')
+            
+            # 1. Prepara o contexto para o template
+            contexto = {
+                'remetente_nome': documento.remetente.nome_razao_social,
+                'protocolo': documento.protocolo,
+                'texto_solicitacao': texto_email,
+                'ano_atual': timezone.now().year,
+            }
+
+            # 2. Renderiza o HTML
+            html_content = render_to_string('emails/solicitacao_diligencia_email.html', contexto)
+            text_content = strip_tags(html_content) # Versão em texto puro (segurança)
+
+            # 3. Configura o e-mail
+            assunto = f"PGM - Solicitação de Documentação: {documento.protocolo}"
+            email = EmailMultiAlternatives(
+                assunto,
+                text_content,
+                settings.DEFAULT_FROM_EMAIL,
+                [email_destino]
+            )
+            email.attach_alternative(html_content, "text/html")
+
+            try:
+                email.send()
+                diligencia.status = 'Enviada'
+                messages.success(request, f"E-mail enviado com sucesso!")
+            except Exception as e:
+                messages.error(request, f"Erro ao disparar e-mail: {str(e)}")
+
+        elif acao == 'negar':
+            # CORREÇÃO: Pega do campo 'texto_decisao_negar' definido no HTML
+            justificativa = request.POST.get('texto_decisao_negar')
+            diligencia.status = 'Rejeitada'
+            diligencia.observacao_chefia = justificativa
+            documento.status = 'Em Análise'
+            documento.save()
+            messages.warning(request, "Solicitação negada e processo devolvido.")
+
+        elif acao == 'concluir_manual':
+            diligencia.status = 'Atendida'
+            # CORREÇÃO: Pega do campo 'texto_decisao_sanear'
+            diligencia.observacao_chefia = request.POST.get('texto_decisao_sanear')
+            
+            # PROCESSAMENTO DE ARQUIVOS (Agora com enctype funcionará)
+            arquivos = request.FILES.getlist('arquivos_saneamento')
+            for f in arquivos:
+                Anexo.objects.create(
+                    documento=documento,
+                    arquivo=f,
+                    tipo_anexo='INICIAL',
+                    usuario_upload=request.user,
+                    descricao=f"Anexo via Saneamento - Diligência #{diligencia.id}"
+                )
+
+            documento.status = 'Em Análise'
+            documento.save()
+            messages.success(request, "Diligência concluída com sucesso!")
+
+        diligencia.save()
+
+        proxima = request.POST.get('proxima_url')
+        return redirect(proxima if proxima else 'gestao:diligencias')
+            
+    return redirect('gestao:diligencias')
+
+@login_required
+def atribuir_procurador_direto_view(request, pk):
+    documento = get_object_or_404(Documento, pk=pk)
+    
+    if request.method == 'POST':
+        procurador_id = request.POST.get('procurador_id')
+        
+        try:
+            procurador = User.objects.get(id=procurador_id)
+            
+            # 1. ATUALIZAÇÃO DO BANCO DE DADOS
+            documento.procurador_atribuido = procurador
+            documento.status = 'Em Análise'
+            documento.data_atribuicao = timezone.now()
+            documento.motivo_ultima_devolucao = None
+            documento.save() # Dispara o cálculo da data limite no Model
+
+            # 2. PREPARAÇÃO DO E-MAIL (Lógica replicada)
+            try:
+                url_documento = request.build_absolute_uri(f'/documento/{documento.pk}/')
+                
+                contexto = {
+                    'procurador_nome': procurador.get_full_name() or procurador.username,
+                    'protocolo': documento.protocolo,
+                    'num_doc_origem': documento.num_doc_origem,
+                    'remetente': documento.remetente.nome_razao_social,
+                    'tipo_documento': documento.tipo_documento.descricao,
+                    'prioridade': documento.prioridade.descricao,
+                    'data_limite': documento.data_limite.strftime('%d/%m/%Y') if documento.data_limite else None,
+                    'observacoes': documento.observacoes_protocolo,
+                    'url_documento': url_documento,
+                    'ano_atual': timezone.now().year,
+                }
+                
+                # Coleta caminhos físicos dos anexos iniciais para anexar ao e-mail
+                anexos_iniciais = documento.anexos.filter(tipo_anexo='INICIAL', ativo=True)
+                anexos_paths = [
+                    anexo.arquivo.path for anexo in anexos_iniciais 
+                    if os.path.exists(anexo.arquivo.path)
+                ]
+                
+                assunto = f"Novo Documento para Análise - Protocolo {documento.protocolo}"
+                
+                # Disparo do e-mail usando sua utilitária
+                sucesso_email = enviar_email_html(
+                    assunto=assunto,
+                    template_name='emails/documento_distribuido.html',
+                    contexto=contexto,
+                    destinatarios=[procurador.email],
+                    anexos=anexos_paths
+                )
+                
+                if sucesso_email:
+                    messages.success(request, f"Processo atribuído e e-mail enviado para {procurador.email}.")
+                else:
+                    messages.warning(request, "Processo atribuído, mas houve uma falha ao enviar o e-mail de notificação.")
+
+            except Exception as e_mail:
+                messages.error(request, f"Erro técnico ao processar e-mail: {e_mail}")
+
+        except User.DoesNotExist:
+            messages.error(request, 'Procurador selecionado inválido.')
+            
+    return redirect('gestao:documento_consulta', pk=pk)
