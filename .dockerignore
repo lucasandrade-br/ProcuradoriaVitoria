@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Databases & Logs
+*.sqlite3
+*.log
+media/
+backups/
+
+# Secrets & Configs
+.env
+.env.*
+*.pem
+*.key
+
+# OS & IDEs
+.DS_Store
+.idea/
+.vscode/
+.git/
+.gitignore

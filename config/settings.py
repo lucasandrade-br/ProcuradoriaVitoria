@@ -9,7 +9,6 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
 import os
 from pathlib import Path
 import environ
@@ -37,9 +36,11 @@ DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
+# Domínio base usado em links externos (e.g., e-mails)
+SITE_BASE_URL = env('SITE_BASE_URL', default='http://localhost:8000')
+
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -48,10 +49,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'gestao',
+    'storages',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -59,6 +62,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
 
 ROOT_URLCONF = 'config.urls'
 
@@ -83,17 +87,58 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+
+if os.environ.get('K_SERVICE'):
+    # Configurações de Rede/Segurança na Nuvem
+    DB_HOST_CLOUD = '/cloudsql/project-0a7f993c-7a6a-4212-aa0:southamerica-east1:pge-db-instance'
+    DB_PORT_CLOUD = ''
+    ALLOWED_HOSTS = [
+        'pge-sistema-663822765346.southamerica-east1.run.app',
+        'localhost', 
+        '127.0.0.1',
+    ]
+    CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+
+    # CONFIGURAÇÃO DE ARMAZENAMENTO NA NUVEM (Django 4.2+)
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+        },
+    }
+    GS_BUCKET_NAME = env('GS_BUCKET_NAME')
+    GS_QUERYSTRING_AUTH = False
+    GS_CACHE_CONTROL = 'public, max-age=3600'
+else:
+    # CONFIGURAÇÃO LOCAL (SEU PC)
+    DB_HOST_CLOUD = env('DB_HOST', default='127.0.0.1')
+    DB_PORT_CLOUD = env('DB_PORT', default='3306')
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+        },
+    }
+    # Mova as linhas de MEDIA para cá, para não afetarem a nuvem
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
+
 DATABASES = {
     'default': {
         'ENGINE': env('DB_ENGINE'),
         'NAME': env('DB_NAME'),
         'USER': env('DB_USER'),
         'PASSWORD': env('DB_PASSWORD'),
-        'HOST': env('DB_HOST'),
-        'PORT': env('DB_PORT'),
-        'OPTIONS': {
-            'ssl': {'ca': os.path.join(BASE_DIR, 'ca.pem')},
-        },
+        'HOST': DB_HOST_CLOUD, 
+        'PORT': DB_PORT_CLOUD,
     }
 }
 
@@ -130,18 +175,17 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+WHITENOISE_MANIFEST_STRICT = False
+LOGO_URL = "https://storage.googleapis.com/pge-sistema-media-files/imagens/logo.png"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Configuração para arquivos de mídia (uploads)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
 # Define a URL da nossa página de login personalizada
 LOGIN_URL = '/accounts/login/' 
-# Define para onde redirecionar o usuário APÓS um login bem-sucedido
 LOGIN_REDIRECT_URL = 'gestao:dashboard'
 # Define para onde redirecionar o usuário APÓS o logout
 LOGOUT_REDIRECT_URL = '/accounts/login/'
@@ -169,34 +213,22 @@ LOGGING = {
             'format': '{levelname} {asctime} {module} {message}',
             'style': '{',
         },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
     },
     'handlers': {
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'sgdp.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
         'console': {
             'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+            'class': 'logging.StreamHandler', # IMPORTANTE: Envia para o log do Google
+            'formatter': 'verbose',
         },
     },
     'loggers': {
         'gestao': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
         'django': {
-            'handlers': ['file'],
+            'handlers': ['console'],
             'level': 'WARNING',
             'propagate': False,
         },
@@ -205,7 +237,6 @@ LOGGING = {
 
 # Configurações de Segurança para Produção (HTTPS)
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000 # 1 ano

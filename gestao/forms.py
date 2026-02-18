@@ -1,14 +1,14 @@
 from django import forms
 from django.forms import inlineformset_factory
+from django.contrib.auth.models import User
 from .models import Documento, Anexo, Remetente, TipoDocumento, NivelPrioridade, User
 from django.utils import timezone
 
-# Este é o formulário principal para cadastrar um Documento
+# Este é o formulário principal para cadastrar um processo
 class DocumentoForm(forms.ModelForm):
     class Meta:
-        model = Documento  # Baseia este formulário no nosso modelo 'Documento'
-        
-        # Define quais campos do modelo 'Documento' queremos no formulário
+        model = Documento  
+
         fields = [
             'remetente', 
             'interessados',
@@ -29,7 +29,7 @@ class DocumentoForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['data_doc_origem'].initial = timezone.now().date()
+        self.fields['data_doc_origem'].initial = timezone.now().strftime('%Y-%m-%d')
         self.fields['tipo_documento'].queryset = TipoDocumento.objects.order_by('descricao')
 
 class AnexoForm(forms.ModelForm):
@@ -78,7 +78,7 @@ class DocumentoFilterForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={
             'placeholder': 'Ex: 2025-10-21-001',
-            'class': 'form-control' # Adicionado
+            'class': 'form-control'
         })
     )
     
@@ -212,7 +212,7 @@ class PinForm(forms.Form):
 class DocumentoUpdateForm(forms.ModelForm):
     class Meta:
         model = Documento
-        fields = ['num_doc_origem', 'protocolo', 'tipo_documento', 'prioridade', 'interessados', 'observacoes_protocolo']
+        fields = ['num_doc_origem', 'protocolo', 'tipo_documento', 'prioridade', 'interessados', 'observacoes_protocolo', 'procurador_atribuido']
         widgets = {
             # Protocolo como Readonly (Apenas Leitura)
             'protocolo': forms.TextInput(attrs={'readonly': 'readonly', 'class': 'form-control-plaintext fw-bold px-2'}),
@@ -222,12 +222,21 @@ class DocumentoUpdateForm(forms.ModelForm):
             # O campo original de interessados ficará escondido, o JS cuidará dele
             'interessados': forms.SelectMultiple(attrs={'class': 'd-none', 'id': 'id_interessados_hidden'}),
             'observacoes_protocolo': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'procurador_atribuido': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Garante que a lista de interessados venha ordenada de A-Z
         self.fields['interessados'].queryset = Remetente.objects.all().order_by('nome_razao_social')
+
+        from django.contrib.auth.models import User
+        self.fields['procurador_atribuido'].queryset = User.objects.filter(
+            groups__name__in=['Procuradores', 'Procurador-Chefe']
+        ).order_by('first_name')
+        
+        # Deixa o campo mais amigável caso esteja vazio
+        self.fields['procurador_atribuido'].empty_label = "Selecione o Procurador Responsável"
 
 AnexoUpdateFormSet = inlineformset_factory(
     Documento, Anexo,
@@ -240,3 +249,17 @@ AnexoUpdateFormSet = inlineformset_factory(
         'ativo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
     }
 )
+
+class RedistribuicaoFeriasForm(forms.Form):
+    procurador_origem = forms.ModelChoiceField(
+        queryset=User.objects.filter(is_active=True, groups__name='Procuradores'),
+        label="Procurador saindo de férias",
+        widget=forms.Select(attrs={'class': 'form-select select2', 'id': 'id_procurador_origem'})
+    )
+
+    procuradores_destino = forms.ModelMultipleChoiceField(
+        queryset=User.objects.filter(is_active=True, groups__name='Procuradores'),
+        label="Procuradores que receberão a carga",
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        help_text="Selecione quem dividirá o trabalho."
+    )

@@ -29,5 +29,7 @@ urlpatterns = [
     path('diligencias/', views.diligencias_pendentes_view, name='diligencias'),
     path('diligencia/decidir/<int:diligencia_id>/', views.decidir_diligencia_view, name='decidir_diligencia'),
     path('documento/atribuir/<int:pk>/', views.atribuir_procurador_direto_view, name='atribuir_procurador_direto'),
+    path('redistribuir-ferias/', views.redistribuir_ferias_view, name='redistribuir_ferias'),
+    path('ajax/get-process-count/', views.get_process_count_ajax, name='get_process_count'),
 ]
 

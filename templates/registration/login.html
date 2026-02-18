@@ -151,7 +151,7 @@
     <div class="card login-card-container">
         <div class="row g-0">
             <div class="col-md-5 login-brand-panel">
-                <img src="{% static 'gestao/imagens/logo.png' %}" alt="Logo Procuradoria">
+                <img src="{{ LOGO_URL|default:'https://storage.googleapis.com/pge-sistema-media-files/imagens/logo.png' }}" alt="Logo Procuradoria">
             </div>
 
             <div class="col-md-7 login-form-panel">
@@ -182,6 +182,10 @@
                         <button class="btn btn-login btn-lg" type="submit">
                             <i class="fas fa-sign-in-alt me-2"></i>Entrar no Sistema
                         </button>
+                    </div>
+
+                    <div class="text-center mt-3">
+                        <a href="{% url 'password_reset' %}" class="text-decoration-none text-white-50">Esqueci minha senha</a>
                     </div>
                 </form>
             </div>

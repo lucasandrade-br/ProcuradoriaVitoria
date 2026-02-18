@@ -1,0 +1,139 @@
+{% extends 'gestao/base.html' %}
+
+{% block content %}
+<style>
+    .procurador-card { transition: all 0.2s; border: 1px solid #dee2e6; cursor: pointer; }
+    .procurador-card:hover { background-color: #f8f9fa; border-color: #04357b; }
+    .hidden-user { display: none !important; }
+    .card-selecionado { border-color: #04357b; background-color: #e7f1ff; }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <form method="POST" id="form-redistribuicao">
+                {% csrf_token %}
+
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold text-start"><i class="fas fa-user-minus me-2"></i>1. Origem: Quem sairá de férias?</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold small text-uppercase">Procurador de Origem</label>
+                                {{ form.procurador_origem }}
+                            </div>
+                            <div class="col-md-4 text-center border-start">
+                                <span class="text-muted small fw-bold d-block">CARGA "EM ANÁLISE"</span>
+                                <h2 class="display-6 fw-bold text-primary mb-0" id="total-processos">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h5 class="mb-0 fw-bold text-success"><i class="fas fa-users me-2"></i>2. Destino: Quem receberá os processos?</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3" id="container-destinos">
+                            {% for checkbox in form.procuradores_destino %}
+                                <div class="col-md-4 destination-item" data-user-id="{{ checkbox.data.value }}">
+                                    <div class="p-3 rounded procurador-card h-100">
+                                        <div class="form-check">
+                                            {{ checkbox.tag }}
+                                            <label class="form-check-label fw-bold ms-2" for="{{ checkbox.id_for_label }}">
+                                                {{ checkbox.choice_label }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-secondary mt-3 border-0 bg-secondary-subtle small d-flex align-items-center text-secondary-emphasis">
+                    <i class="fas fa-info-circle fa-lg me-3"></i>
+                    <div>
+                        O sistema utilizará um <strong>algoritmo lógico</strong> para garantir que a diferença de processos entre os selecionados seja de, no máximo, 1 unidade.
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm bg-dark text-white">
+                    <div class="card-body d-flex align-items-center justify-content-between py-4">
+                        <div class="me-3">
+                            <h5 class="mb-1 fw-bold text-warning"><i class="fas fa-shield-alt me-2"></i>Ação Irreversível</h5>
+                            <p class="mb-0 small text-light-50">Todos os logs de auditoria serão registrados.</p>
+                        </div>
+                        <button type="submit" class="btn btn-lg px-5 fw-bold" style="background-color: #ffc107; color: #000;">
+                            <i class="fas fa-check-circle me-2"></i>Confirmar Redistribuição
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Mapeamento de Elementos (JavaScript Puro)
+    const selectOrigem = document.querySelector('select[name="procurador_origem"]');
+    const displayTotal = document.getElementById('total-processos');
+    const destinationItems = document.querySelectorAll('.destination-item');
+
+    // 2. Função para atualizar contador e esconder usuário
+    if (selectOrigem) {
+        selectOrigem.addEventListener('change', function() {
+            const userId = this.value;
+
+            // Lógica para esconder o procurador de origem na lista de destinos
+            destinationItems.forEach(item => {
+                const itemUserId = item.getAttribute('data-user-id');
+                const checkbox = item.querySelector('input[type="checkbox"]');
+
+                if (itemUserId === userId) {
+                    item.classList.add('hidden-user');
+                    if (checkbox) checkbox.checked = false; // Desmarca se estiver escondido
+                } else {
+                    item.classList.remove('hidden-user');
+                }
+            });
+
+            // Lógica AJAX para buscar a quantidade de processos
+            if (!userId) {
+                displayTotal.innerText = '0';
+                return;
+            }
+
+            // Mostra um "carregando" visual
+            displayTotal.innerText = "...";
+
+            fetch(`{% url 'gestao:get_process_count' %}?user_id=${userId}`)
+                .then(response => response.json())
+                .then(data => {
+                    displayTotal.innerText = data.count;
+                })
+                .catch(err => {
+                    console.error("Erro na busca de processos:", err);
+                    displayTotal.innerText = "!";
+                });
+        });
+    }
+
+    // Estilização extra: mudar cor do card ao marcar o checkbox
+    document.querySelectorAll('.procurador-card input[type="checkbox"]').forEach(check => {
+        check.addEventListener('change', function() {
+            const card = this.closest('.procurador-card');
+            if (this.checked) {
+                card.classList.add('card-selecionado');
+            } else {
+                card.classList.remove('card-selecionado');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

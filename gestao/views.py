@@ -1,25 +1,30 @@
+import itertools
 import logging
 import os
-from django.shortcuts import render, redirect, get_object_or_404
+from urllib import request
+
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.hashers import make_password, check_password
-from .models import Documento, Anexo, HistoricoEdicao, Remetente, SolicitacaoDocumento
-from django.http import JsonResponse
-from .forms import DocumentoForm, AnexoFormSet, AnexoForm, FinalizacaoForm, DocumentoFilterForm, RemetenteForm, PinForm, DocumentoUpdateForm, AnexoUpdateFormSet
-from django.utils import timezone
-from django.contrib import messages
-from django.core.exceptions import PermissionDenied
-from django.db.models import Max, Q
+from django.contrib.auth.views import PasswordResetView
 from django.core.mail import EmailMessage, send_mail, EmailMultiAlternatives
 from django.conf import settings
 from django.core.paginator import Paginator
-from django.urls import reverse
-from datetime import datetime
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags
+from django.contrib import messages
+from django.core.exceptions import PermissionDenied
+from django.db.models import Max, Q
 from django.db import transaction
-from .email_utils import enviar_email_html
+from django.http import JsonResponse
+from django.utils import timezone
+from django.urls import reverse
+from django.utils.html import strip_tags
+from django.template.loader import render_to_string
+from django.shortcuts import render, redirect, get_object_or_404
+
+from datetime import datetime
+from .models import Documento, Anexo, HistoricoEdicao, Remetente, SolicitacaoDocumento, Profile, NivelPrioridade
+from .forms import DocumentoForm, AnexoFormSet, AnexoForm, FinalizacaoForm, DocumentoFilterForm, RemetenteForm, PinForm, DocumentoUpdateForm, AnexoUpdateFormSet, RedistribuicaoFeriasForm
+from .email_utils import enviar_email_html, build_absolute_system_url
 
 logger = logging.getLogger('gestao')
 
@@ -165,12 +170,15 @@ def distribuicao_view(request):
                 
                 doc.save() # Dispara o cálculo da data limite
 
-                # --- INÍCIO DO BLOCO DE ENVIO DE E-MAIL ---
                 try:
                     from .email_utils import enviar_email_html
                     
-                    url_documento = request.build_absolute_uri(f'/documento/{doc.pk}/')
+                    # Pegamos os anexos como objetos de arquivo, não como caminhos de texto
+                    anexos_iniciais = doc.anexos.filter(tipo_anexo='INICIAL', ativo=True)
+                    # Passamos o objeto 'anexo.arquivo' diretamente. A função enviar_email_html cuidará do resto.
+                    lista_anexos = [anexo.arquivo for anexo in anexos_iniciais]
                     
+                    primeiro_inicial = anexos_iniciais.first()
                     contexto = {
                         'procurador_nome': procurador.get_full_name() or procurador.username,
                         'protocolo': doc.protocolo,
@@ -178,21 +186,20 @@ def distribuicao_view(request):
                         'remetente': doc.remetente.nome_razao_social,
                         'tipo_documento': doc.tipo_documento.descricao,
                         'prioridade': doc.prioridade.descricao,
-                        'data_limite': doc.data_limite.strftime('%d/%m/%Y') if doc.data_limite else None,
+                        'data_limite': doc.data_limite.strftime('%d/%m/%Y') if doc.data_limite else "Não definida",
                         'observacoes': doc.observacoes_protocolo,
-                        'url_documento': url_documento,
+                        # Usa a URL do primeiro anexo inicial ativo, compatível com storage
+                        'url_documento': primeiro_inicial.arquivo.url if primeiro_inicial else None,
                     }
                     
-                    anexos_iniciais = doc.anexos.filter(tipo_anexo='INICIAL', ativo=True)
-                    anexos_paths = [anexo.arquivo.path for anexo in anexos_iniciais if os.path.exists(anexo.arquivo.path)]
-                    
                     assunto = f"Novo Documento para Análise - Protocolo {doc.protocolo}"
+                    
                     sucesso = enviar_email_html(
                         assunto=assunto,
                         template_name='emails/documento_distribuido.html',
                         contexto=contexto,
                         destinatarios=[procurador.email],
-                        anexos=anexos_paths
+                        anexos=lista_anexos # Passando a lista de objetos do Cloud Storage
                     )
                     
                     if sucesso:
@@ -200,9 +207,8 @@ def distribuicao_view(request):
                         logger.info(f"E-mail de distribuição enviado para {procurador.email} - Documento {doc.protocolo}")
 
                 except Exception as e_mail:
-                    # Captura erros no envio (configuração errada, email inválido, etc.)
                     messages.error(request, f"Erro ao enviar e-mail para o documento {doc.protocolo}: {e_mail}")
-
+                    logger.error(f"Erro no envio de e-mail (Protocolo {doc.protocolo}): {str(e_mail)}")
 
 
             nome_procurador = procurador.get_full_name() or procurador.username
@@ -441,23 +447,108 @@ def monitoramento_analises_view(request):
     if not request.user.is_superuser and not is_protocolo_chefe and not is_protocolo:
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
 
-    # 1. A Lógica Otimizada:
-    lista_de_documentos = Documento.objects.filter(
-        status__in=['Em Análise', 'Análise Concluída', 'Rejeitado', 'Em Diligência']
+    monitoramento_statuses = ['Em Análise', 'Análise Concluída', 'Rejeitado', 'Em Diligência']
+
+    documentos_queryset = Documento.objects.filter(
+        status__in=monitoramento_statuses
     ).select_related(
-        'tipo_documento', 
-        'prioridade', 
+        'tipo_documento',
+        'prioridade',
         'procurador_atribuido'
     ).prefetch_related(
-        'interessados'  # <--- CRUCIAL para a tabela que você alterou!
+        'interessados'
     ).order_by('data_limite')
 
-    # 2. O Contexto
-    context = {
-        'documentos': lista_de_documentos
+    def parse_int(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    status_filter = request.GET.get('status')
+    if status_filter:
+        documentos_queryset = documentos_queryset.filter(status=status_filter)
+
+    prioridade_filter = request.GET.get('prioridade')
+    prioridade_id = parse_int(prioridade_filter)
+    if prioridade_id:
+        documentos_queryset = documentos_queryset.filter(prioridade_id=prioridade_id)
+
+    procurador_filter = request.GET.get('procurador')
+    procurador_id = parse_int(procurador_filter)
+    if procurador_id:
+        documentos_queryset = documentos_queryset.filter(procurador_atribuido_id=procurador_id)
+
+    interessado_filter = request.GET.get('interessado')
+    interessado_id = parse_int(interessado_filter)
+    if interessado_id:
+        documentos_queryset = documentos_queryset.filter(interessados__id=interessado_id)
+
+    documentos_queryset = documentos_queryset.distinct()
+
+    page_size_options = [10, 30, 50]
+    page_size_value = parse_int(request.GET.get('page_size'))
+    page_size = page_size_value if page_size_value in page_size_options else page_size_options[0]
+
+    paginator = Paginator(documentos_queryset, page_size)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    def build_page_window(paginator_obj, current_page):
+        total_pages = paginator_obj.num_pages
+        if total_pages <= 7:
+            return list(range(1, total_pages + 1))
+        slots = {1, total_pages, current_page}
+        for offset in (1, 2):
+            slots.add(current_page - offset)
+            slots.add(current_page + offset)
+        ordered_slots = [page for page in sorted(slots) if 1 <= page <= total_pages]
+        window = []
+        previous = None
+        for page in ordered_slots:
+            if previous and page - previous > 1:
+                window.append('...')
+            window.append(page)
+            previous = page
+        return window
+
+    page_window = build_page_window(paginator, page_obj.number)
+
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+    preserved_querystring = query_params.urlencode()
+
+    selected_filters = {
+        'status': status_filter or '',
+        'prioridade': prioridade_filter or '',
+        'procurador': procurador_filter or '',
+        'interessado': interessado_filter or '',
+        'page_size': str(page_size),
     }
 
-    # 3. Renderizar
+    active_filter_keys = ['status', 'prioridade', 'procurador', 'interessado']
+    filters_count = len([value for key, value in selected_filters.items() if key in active_filter_keys and value])
+
+    prioridades = NivelPrioridade.objects.order_by('descricao')
+    procuradores = User.objects.filter(documentos_atribuidos__isnull=False).distinct().order_by('first_name', 'last_name', 'username')
+    interessados = Remetente.objects.filter(processos_interessados__isnull=False).distinct().order_by('nome_razao_social')
+
+    context = {
+        'documentos': page_obj,
+        'page_obj': page_obj,
+        'total_documentos': paginator.count,
+        'status_options': monitoramento_statuses,
+        'prioridades': prioridades,
+        'procuradores': procuradores,
+        'interessados': interessados,
+        'page_size_options': page_size_options,
+        'selected_filters': selected_filters,
+        'filters_count': filters_count,
+        'querystring': preserved_querystring,
+        'is_paginated': page_obj.has_other_pages(),
+        'page_window': page_window,
+    }
+
     return render(request, 'gestao/monitoramento_analises.html', context)
 
 
@@ -537,21 +628,20 @@ def finalizacao_detail_view(request, pk):
                 documento_salvo.finalizado_por = request.user
                 documento_salvo.save()
                 
-                # --- LÓGICA DE ENVIO DE E-MAIL (REFATORADA PARA MÚLTIPLOS DESTINATÁRIOS) ---
+                # --- LÓGICA DE ENVIO DE E-MAIL (CORRIGIDA PARA CLOUD STORAGE) ---
                 email_enviado_sucesso = False
                 try:
                     from .email_utils import enviar_email_html
                     
-                    # 1. Monta a lista de destinatários (Interessados + Opcional Remetente)
-                    destinatarios = [i.email for i in documento.interessados.all() if i.email] #
+                    # 1. Monta a lista de destinatários (Mantida a sua lógica original que está correta)
+                    destinatarios = [i.email for i in documento.interessados.all() if i.email]
                     
-                    if documento.notificar_remetente and documento.remetente.email: #
-                        destinatarios.append(documento.remetente.email) #
+                    if documento.notificar_remetente and documento.remetente.email:
+                        destinatarios.append(documento.remetente.email)
 
                     # Só prossegue se houver pelo menos um e-mail na lista
                     if destinatarios:
                         contexto = {
-                            # Dica: No template, você pode mudar 'remetente_nome' para algo mais genérico
                             'remetente_nome': "Interessados", 
                             'protocolo': documento.protocolo,
                             'num_doc_origem': documento.num_doc_origem,
@@ -559,21 +649,21 @@ def finalizacao_detail_view(request, pk):
                             'observacoes_finalizacao': documento.obs_finalizacao,
                         }
                         
-                        # Lógica de anexos permanece a mesma (Muito boa por sinal!)
-                        anexos_paths = []
+                        # 2. AJUSTE NOS ANEXOS: Passamos o objeto do arquivo, não o caminho de texto
+                        lista_anexos = []
                         for anexo in documento.anexos.filter(tipo_anexo__in=['INICIAL', 'RESPOSTA'], ativo=True):
-                            if os.path.exists(anexo.arquivo.path):
-                                anexos_paths.append(anexo.arquivo.path)
+                            if anexo.arquivo: # Verifica se existe um arquivo vinculado
+                                lista_anexos.append(anexo.arquivo) # Adicionamos o objeto FieldFile diretamente
                         
                         assunto = f"Resposta ao Documento Protocolo {documento.protocolo} - Procuradoria"
                         
-                        # Enviamos para a LISTA completa
+                        # Enviamos para a LISTA completa usando os objetos do Storage
                         email_enviado_sucesso = enviar_email_html(
                             assunto=assunto,
                             template_name='emails/resposta_remetente.html',
                             contexto=contexto,
-                            destinatarios=destinatarios, # Passa a lista aqui
-                            anexos=anexos_paths
+                            destinatarios=destinatarios,
+                            anexos=lista_anexos # Enviando a lista de objetos do Cloud Storage
                         )
                         
                         if email_enviado_sucesso:
@@ -585,10 +675,6 @@ def finalizacao_detail_view(request, pk):
                     logger.error(f"Erro ao enviar e-mail de resposta do documento {documento.protocolo}: {e}")
                     messages.error(request, f"Documento arquivado, mas falha ao enviar e-mail: {e}")
 
-                if email_enviado_sucesso:
-                    messages.success(request, f"Documento {documento.protocolo} arquivado e e-mails enviados aos interessados!")
-                else:
-                    messages.success(request, f"Documento {documento.protocolo} arquivado com sucesso! (Nenhum e-mail enviado).")
                 return redirect('gestao:monitoramento_analises')
             else:
                 messages.error(request, "Erro ao arquivar. Verifique se TODOS os registros estão corretos - Descrição Final também é obrigatória.")
@@ -930,51 +1016,52 @@ def enviar_lembrete_view(request, pk):
          messages.error(request, f"Não é possível enviar lembrete. O procurador {documento.procurador_atribuido.username} não possui e-mail cadastrado.")
          return redirect('gestao:monitoramento_analises')
 
-    # --- LÓGICA POST (ENVIO DO E-MAIL) ---
+    # --- LÓGICA POST (ENVIO DO E-MAIL CORRIGIDA) ---
     if request.method == 'POST':
         mensagem_personalizada = request.POST.get('custom_message', '').strip()
 
         try:
-            # Prepara o contexto para o template
-            url_documento = request.build_absolute_uri(f'/documento/{documento.pk}/')
+            # 1. Busca o anexo inicial para gerar a URL (Já que Documento não tem 'arquivo')
+            anexo_inicial = documento.anexos.filter(tipo_anexo='INICIAL', ativo=True).first()
+            url_doc_storage = anexo_inicial.arquivo.url if anexo_inicial else None
             
             contexto = {
                 'procurador_nome': documento.procurador_atribuido.get_full_name() or documento.procurador_atribuido.username,
                 'protocolo': documento.protocolo,
                 'num_doc_origem': documento.num_doc_origem,
                 'remetente': documento.remetente.nome_razao_social,
-                'tipo_documento': documento.tipo_documento,
-                'prioridade': documento.prioridade,
-                'data_limite': documento.data_limite.strftime('%d/%m/%Y') if documento.data_limite else None,
+                'tipo_documento': documento.tipo_documento.descricao if hasattr(documento.tipo_documento, 'descricao') else documento.tipo_documento,
+                'prioridade': documento.prioridade.descricao if hasattr(documento.prioridade, 'descricao') else documento.prioridade,
+                'data_limite': documento.data_limite.strftime('%d/%m/%Y') if documento.data_limite else "Não definida",
                 'prazo_proximo': verificar_prazo_proximo(documento.data_limite, dias=3),
                 'mensagem_personalizada': mensagem_personalizada,
-                'url_documento': url_documento,
+                'url_documento': url_doc_storage, # Agora via objeto Anexo
             }
             
-            # Prepara anexos
-            anexos_iniciais = documento.anexos.filter(tipo_anexo='INICIAL', ativo=True)
-            anexos_paths = [anexo.arquivo.path for anexo in anexos_iniciais if os.path.exists(anexo.arquivo.path)]
+            # 2. COLETA DE ANEXOS: Captura os objetos de arquivo (FieldFile) da relação correta
+            anexos_para_enviar = documento.anexos.filter(tipo_anexo='INICIAL', ativo=True)
+            # Extraímos o campo .arquivo de cada registro da tabela Anexo
+            lista_anexos = [anexo.arquivo for anexo in anexos_para_enviar if anexo.arquivo]
             
-            # Envia o e-mail HTML
+            # 3. Envio do e-mail HTML
             assunto = f"Lembrete: Documento Pendente - Protocolo {documento.protocolo}"
             sucesso = enviar_email_html(
                 assunto=assunto,
                 template_name='emails/lembrete_procurador.html',
                 contexto=contexto,
                 destinatarios=[email_procurador],
-                anexos=anexos_paths
+                anexos=lista_anexos
             )
             
             if sucesso:
                 logger.info(f"Lembrete enviado para {email_procurador} - Documento {documento.protocolo}")
-                messages.success(request, f"Lembrete enviado com sucesso para {email_procurador} ({len(anexos_paths)} anexo(s) incluído(s)).")
+                messages.success(request, f"Lembrete enviado com sucesso para {email_procurador} ({len(lista_anexos)} anexo(s) incluído(s)).")
             else:
                 messages.error(request, f"Erro ao enviar e-mail de lembrete para o documento {documento.protocolo}.")
 
         except Exception as e_mail:
             logger.error(f"Erro ao enviar lembrete do documento {documento.protocolo}: {e_mail}")
-            messages.error(request, f"Erro ao enviar e-mail de lembrete: {e_mail}")
-        
+            messages.error(request, f"Erro ao enviar e-mail de lembrete: {e_mail}")        
         # Redireciona de volta para a LISTA após enviar
         return redirect('gestao:monitoramento_analises')
 
@@ -1045,7 +1132,7 @@ def confirmacao_detail_view(request, pk):
         documento.finalizado_por = request.user # Agora o 'finalizado_por' é o Analista
         documento.save()
 
-        # --- LÓGICA DE ENVIO DE E-MAIL PARA O REMETENTE ---
+        # --- LÓGICA DE ENVIO DE E-MAIL PARA O REMETENTE (CORRIGIDA PARA CLOUD) ---
         email_enviado_sucesso = False
         try:
             from .email_utils import enviar_email_html
@@ -1057,31 +1144,39 @@ def confirmacao_detail_view(request, pk):
                     'protocolo': documento.protocolo,
                     'num_doc_origem': documento.num_doc_origem,
                     'data_finalizacao': documento.data_finalizacao.strftime('%d/%m/%Y %H:%M') if documento.data_finalizacao else timezone.now().strftime('%d/%m/%Y %H:%M'),
-                    'observacoes_finalizacao': documento.obs_finalizacao,
+                    'observacoes_finalizacao': documento.obs_final_atendimento if hasattr(documento, 'obs_final_atendimento') else documento.obs_finalizacao,
                 }
                 
-                anexos_paths = []
-                for anexo in documento.anexos.filter(tipo_anexo__in=['INICIAL', 'RESPOSTA'], ativo=True):
-                    if os.path.exists(anexo.arquivo.path):
-                        anexos_paths.append(anexo.arquivo.path)
+                # AJUSTE NOS ANEXOS: Captura os objetos de arquivo (FieldFile) diretamente
+                # Isso permite que a função enviar_email_html leia os bytes do Cloud Storage
+                lista_anexos = [
+                    anexo.arquivo for anexo in documento.anexos.filter(
+                        tipo_anexo__in=['INICIAL', 'RESPOSTA'], 
+                        ativo=True
+                    ) if anexo.arquivo
+                ]
                 
                 assunto = f"Resposta ao Documento Protocolo {documento.protocolo} - Procuradoria"
+                
+                # Chamada da função utilizando a lista de objetos
                 email_enviado_sucesso = enviar_email_html(
                     assunto=assunto,
                     template_name='emails/resposta_remetente.html',
                     contexto=contexto,
                     destinatarios=[email_remetente],
-                    anexos=anexos_paths
+                    anexos=lista_anexos
                 )
                 
                 if email_enviado_sucesso:
-                    logger.info(f"E-mail de resposta (confirmação) enviado para {email_remetente} - Documento {documento.protocolo}")
+                    logger.info(f"E-mail de resposta enviado para {email_remetente} - Documento {documento.protocolo}")
             else:
                 logger.info(f"Doc {documento.protocolo} finalizado sem e-mail (remetente sem e-mail).")
+
         except Exception as e:
-            logger.error(f"Erro ao enviar e-mail de resposta (confirmação) do documento {documento.protocolo}: {e}")
+            logger.error(f"Erro ao enviar e-mail de resposta do documento {documento.protocolo}: {e}")
             messages.error(request, f"Documento arquivado, mas falha ao enviar e-mail: {e}")
-        
+
+        # Mensagens de feedback para o usuário
         if email_enviado_sucesso:
             messages.success(request, f"Documento {documento.protocolo} confirmado, arquivado e e-mail enviado ao remetente!")
         else:
@@ -1108,30 +1203,25 @@ def confirmacao_detail_view(request, pk):
     
     return render(request, 'gestao/confirmacao_detail.html', context)
 
-
 @login_required
 def definir_pin_view(request):
-    # Pega o perfil do usuário logado (criado pelos signals)
-    profile = request.user.profile
+    # EM VEZ DE: profile = request.user.profile
+    # USAMOS: get_or_create para garantir que o objeto exista no banco
+    profile, created = Profile.objects.get_or_create(user=request.user)
     
     # Lógica POST: Processa o formulário enviado
     if request.method == 'POST':
         form = PinForm(request.POST)
         if form.is_valid():
-            # Pega o PIN validado
             novo_pin = form.cleaned_data.get('novo_pin')
-            
-            # Criptografa (hash) o PIN antes de salvar
             pin_hash = make_password(novo_pin)
             
-            # Salva o PIN criptografado no perfil do usuário
             profile.pin_autorizacao = pin_hash
             profile.save()
             
             messages.success(request, "Seu PIN de autorização foi definido/atualizado com sucesso!")
-            return redirect('gestao:dashboard') # Redireciona para o Dashboard
+            return redirect('gestao:dashboard') 
     
-    # Lógica GET: Mostra o formulário vazio
     else:
         form = PinForm()
 
@@ -1195,41 +1285,53 @@ def rejeitar_confirmacao_view(request, pk):
         documento.obs_finalizacao = None # Limpa a observação do protocolador (pois foi rejeitada)
         documento.save(update_fields=['status', 'motivo_rejeicao_analista', 'obs_finalizacao'])
 
-        # 2. Notifica o PROCURADOR ORIGINAL por e-mail (Bônus)
+        # --- LÓGICA DE ENVIO DE E-MAIL PARA O PROCURADOR (DEVOLUÇÃO) ---
         try:
             from .email_utils import enviar_email_html
             
             procurador_original = documento.procurador_atribuido
+            
             if procurador_original and procurador_original.email:
-                url_documento = request.build_absolute_uri(f'/documento/{documento.pk}/')
-                
+                # 1. Definição da URL: pega o primeiro anexo inicial ativo do storage
+                anexo_inicial = documento.anexos.filter(tipo_anexo='INICIAL', ativo=True).first()
+                url_doc_storage = anexo_inicial.arquivo.url if anexo_inicial else None
+
                 contexto = {
                     'procurador_nome': procurador_original.get_full_name() or procurador_original.username,
                     'protocolo': documento.protocolo,
                     'num_doc_origem': documento.num_doc_origem,
                     'remetente': documento.remetente.nome_razao_social,
                     'motivo_devolucao': motivo_rejeicao,
-                    'url_documento': url_documento,
+                    'url_documento': url_doc_storage, # Link para o PDF no Google Storage
                 }
                 
                 assunto = f"Revisão Solicitada: Processo {documento.protocolo} Devolvido"
+                
+                # 2. Anexos: envia arquivos reais (FieldFile) do storage
+                anexos_reais = [
+                    anexo.arquivo for anexo in documento.anexos.filter(tipo_anexo__in=['INICIAL', 'RESPOSTA'], ativo=True)
+                    if anexo.arquivo
+                ]
+
                 sucesso = enviar_email_html(
                     assunto=assunto,
                     template_name='emails/documento_devolvido.html',
                     contexto=contexto,
-                    destinatarios=[procurador_original.email]
+                    destinatarios=[procurador_original.email],
+                    anexos=anexos_reais
                 )
                 
                 if sucesso:
                     logger.info(f"E-mail de devolução enviado para {procurador_original.email} - Documento {documento.protocolo}")
             else:
-                 messages.warning(request, "Documento devolvido, mas não foi possível notificar o procurador original (e-mail ausente).")
+                messages.warning(request, "Documento devolvido, mas não foi possível notificar o procurador original (e-mail ausente).")
 
         except Exception as e:
             logger.error(f"Erro ao enviar e-mail de rejeição do documento {documento.protocolo}: {e}")
             messages.warning(request, "Documento devolvido, mas falha ao notificar o procurador por e-mail.")
-        
+
         messages.success(request, f"Documento {documento.protocolo} rejeitado e devolvido para 'Em Análise'.")
+
         # Redireciona de volta para a lista de confirmação (de onde o documento sumirá)
         return redirect('gestao:confirmacao_lista')
 
@@ -1324,8 +1426,14 @@ def documento_update_view(request, pk):
                 )
 
             # --- 2. SALVAR DOCUMENTO PRINCIPAL ---
-            # Isso já salva os campos e os Interessados (M2M) automaticamente
-            form.save()
+            documento_atualizado = form.save(commit=False)
+
+            # Se o procurador foi alterado, registra a nova data de atribuição
+            if 'procurador_atribuido' in form.changed_data:
+                documento_atualizado.data_atribuicao = timezone.now() if documento_atualizado.procurador_atribuido else None
+
+            documento_atualizado.save()
+            form.save_m2m()
 
             # --- 3. SALVAR NOVOS ANEXOS (OU EDITADOS) ---
             # Usamos commit=False para injetar o usuário logado e evitar o IntegrityError
@@ -1352,12 +1460,18 @@ def documento_update_view(request, pk):
             messages.success(request, f"Processo {documento.protocolo} atualizado com sucesso.")
             # DECISÃO DE REDIRECIONAMENTO
             if voltar_para == 'finalizacao':
-                url_nome = 'gestao:finalizacao_detail' # Ajuste para o nome real da sua rota
+                url_nome = 'gestao:finalizacao_detail'
             else:
                 url_nome = 'gestao:documento_consulta'
 
             url_destino = reverse(url_nome, kwargs={'pk': pk})
             return redirect(f"{url_destino}?origem={origem}")
+        else:
+            # ISSO VAI MOSTRAR O ERRO NO TOPO DA TELA
+            messages.error(request, "Erro na validação do formulário. Verifique os campos.")
+            # Opcional: Mostra os erros exatos no console do PythonAnywhere
+            print(f"Erros do Form: {form.errors}")
+            print(f"Erros do Formset: {formset.errors}")
     else:
         form = DocumentoUpdateForm(instance=documento)
         formset = AnexoUpdateFormSet(instance=documento)
@@ -1486,50 +1600,121 @@ def atribuir_procurador_direto_view(request, pk):
             documento.motivo_ultima_devolucao = None
             documento.save() # Dispara o cálculo da data limite no Model
 
-            # 2. PREPARAÇÃO DO E-MAIL (Lógica replicada)
+            # 2. PREPARAÇÃO DO E-MAIL (CORRIGIDA PARA GOOGLE CLOUD STORAGE)
             try:
-                url_documento = request.build_absolute_uri(f'/documento/{documento.pk}/')
-                
+                # 1. Ajuste da URL: usa o primeiro anexo inicial ativo do storage
+                anexo_inicial = documento.anexos.filter(tipo_anexo='INICIAL', ativo=True).first()
+                url_doc_storage = anexo_inicial.arquivo.url if anexo_inicial else None
+
                 contexto = {
                     'procurador_nome': procurador.get_full_name() or procurador.username,
                     'protocolo': documento.protocolo,
                     'num_doc_origem': documento.num_doc_origem,
                     'remetente': documento.remetente.nome_razao_social,
-                    'tipo_documento': documento.tipo_documento.descricao,
-                    'prioridade': documento.prioridade.descricao,
-                    'data_limite': documento.data_limite.strftime('%d/%m/%Y') if documento.data_limite else None,
+                    'tipo_documento': documento.tipo_documento.descricao if hasattr(documento.tipo_documento, 'descricao') else documento.tipo_documento,
+                    'prioridade': documento.prioridade.descricao if hasattr(documento.prioridade, 'descricao') else documento.prioridade,
+                    'data_limite': documento.data_limite.strftime('%d/%m/%Y') if documento.data_limite else "Não definida",
                     'observacoes': documento.observacoes_protocolo,
-                    'url_documento': url_documento,
+                    'url_documento': url_doc_storage, # URL direta do Google Storage
                     'ano_atual': timezone.now().year,
                 }
                 
-                # Coleta caminhos físicos dos anexos iniciais para anexar ao e-mail
+                # 2. COLETA DE OBJETOS: Em vez de paths (strings), coletamos os objetos de arquivo (FieldFile)
                 anexos_iniciais = documento.anexos.filter(tipo_anexo='INICIAL', ativo=True)
-                anexos_paths = [
-                    anexo.arquivo.path for anexo in anexos_iniciais 
-                    if os.path.exists(anexo.arquivo.path)
-                ]
+                lista_anexos = [anexo.arquivo for anexo in anexos_iniciais if anexo.arquivo]
                 
                 assunto = f"Novo Documento para Análise - Protocolo {documento.protocolo}"
                 
-                # Disparo do e-mail usando sua utilitária
+                # 3. DISPARO: Passamos a lista de objetos. 
+                # A função enviar_email_html usará .open('rb') para ler os bytes do Bucket.
                 sucesso_email = enviar_email_html(
                     assunto=assunto,
                     template_name='emails/documento_distribuido.html',
                     contexto=contexto,
                     destinatarios=[procurador.email],
-                    anexos=anexos_paths
+                    anexos=lista_anexos
                 )
                 
                 if sucesso_email:
                     messages.success(request, f"Processo atribuído e e-mail enviado para {procurador.email}.")
                 else:
-                    messages.warning(request, "Processo atribuído, mas houve uma falha ao enviar o e-mail de notificação.")
+                    messages.warning(request, f"Processo atribuído, mas houve uma falha ao enviar o e-mail (Anexos processados: {len(lista_anexos)}).")
 
             except Exception as e_mail:
+                logger.error(f"Erro técnico ao processar e-mail de atribuição (Doc: {documento.protocolo}): {e_mail}")
                 messages.error(request, f"Erro técnico ao processar e-mail: {e_mail}")
 
         except User.DoesNotExist:
             messages.error(request, 'Procurador selecionado inválido.')
             
     return redirect('gestao:documento_consulta', pk=pk)
+
+@login_required
+@transaction.atomic
+def redistribuir_ferias_view(request):
+    # REGRA DE ACESSO: Apenas Admins ou quem você definir como chefia
+    if not (request.user.is_superuser or request.user.groups.filter(name__in=['Protocolador-Chefe', 'Procurador-Chefe']).exists()):
+        raise PermissionDenied("Você não tem permissão para realizar redistribuições.")
+
+    if request.method == 'POST':
+        form = RedistribuicaoFeriasForm(request.POST)
+        if form.is_valid():
+            origem = form.cleaned_data['procurador_origem']
+            destinos = list(form.cleaned_data['procuradores_destino'])
+
+            # Buscamos o status EXATO com acento
+            processos = Documento.objects.filter(procurador_atribuido=origem, status='Em Análise')
+            total = processos.count()
+
+            if total == 0:
+                messages.warning(request, f"Nenhum processo 'Em Análise' encontrado para {origem.username}.")
+                return redirect('gestao:redistribuir_ferias')
+
+            pool_destinos = itertools.cycle(destinos)
+
+            for processo in processos:
+                novo_dono = next(pool_destinos)
+
+                # Criando o Log de Auditoria
+                HistoricoEdicao.objects.create(
+                    documento=processo,
+                    usuario=request.user,
+                    campo_alterado="Redistribuição de Férias",
+                    valor_antigo=f"Atribuído a: {origem.username}",
+                    valor_novo=f"Reatribuído a: {novo_dono.username}"
+                )
+
+                processo.procurador_atribuido = novo_dono
+                processo.save()
+
+            messages.success(request, f"Sucesso! {total} processos redistribuídos entre {len(destinos)} procuradores.")
+            return redirect('gestao:dashboard')
+    else:
+        form = RedistribuicaoFeriasForm()
+
+    return render(request, 'gestao/redistribuir_ferias.html', {'form': form})
+
+def get_process_count_ajax(request):
+    user_id = request.GET.get('user_id')
+    # O print abaixo aparecerá no terminal do PythonAnywhere (Server Log)
+    print(f">>> AJAX: Buscando processos para o ID {user_id}")
+
+    count = Documento.objects.filter(
+        procurador_atribuido_id=user_id,
+        status='Em Análise'
+    ).count()
+
+    return JsonResponse({'count': count})
+
+class SGDPPasswordResetView(PasswordResetView):
+    """Customiza o e-mail de recuperação para usar o layout oficial."""
+
+    email_template_name = 'registration/password_reset_email.txt'
+    subject_template_name = 'registration/password_reset_subject.txt'
+    html_email_template_name = 'emails/password_reset_email.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['ano_atual'] = timezone.now().year
+        context['sistema_nome'] = 'Sistema de Gestão Administrativa'
+        return context

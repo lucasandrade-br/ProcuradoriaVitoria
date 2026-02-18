@@ -293,17 +293,23 @@
                 theme: "bootstrap-5",
             });
 
-            // Interessados Múltiplos (NOVO)
-            $('#{{ documento_form.interessados.id_for_label }}').select2({
+            // Interessados Múltiplos
+            var $interessadosSelect = $('#{{ documento_form.interessados.id_for_label }}');
+
+            $interessadosSelect.select2({
                 placeholder: "Busque e selecione as secretarias interessadas...",
                 allowClear: true,
-                multiple: true, // Habilita múltipla escolha
+                multiple: true,
                 minimumInputLength: 2,
                 ajax: select2AjaxConfig,
                 width: '100%',
                 theme: "bootstrap-5",
-                closeOnSelect: false, // Mantém o menu aberto para facilitar várias seleções
-            });    
+                closeOnSelect: false,
+            });
+
+            $interessadosSelect.on('select2:select', function (e) {
+                $('.select2-search__field').val('');
+            });
 
             
             // --- 3. SCRIPT DO MODAL DE REMETENTE ---
@@ -340,6 +346,7 @@
                     })
                     .then(response => response.json())
                     .then(data => {
+                        hideLoading();
                         if (data.success) {
                             // SUCESSO
                             const newOption = new Option(data.nome, data.id, true, true);
@@ -360,6 +367,7 @@
                         }
                     })
                     .catch(error => {
+                        hideLoading();
                         console.error('Erro na requisição AJAX:', error);
                         modalErrorsDiv.textContent = 'Erro de comunicação com o servidor.';
                     });

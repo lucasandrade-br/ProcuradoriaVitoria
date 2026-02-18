@@ -57,7 +57,7 @@ class Command(BaseCommand):
                     destinatarios=[p_data['email']]
                 )
 
-        # 2. Enviar e-mail para Chefia (Passando o agrupamento completo)
+        # 2. Enviar e-mail para Chefes (Passando o agrupamento completo)
         if emails_chefes:
             enviar_email_html(
                 assunto="RELATÓRIO DE GESTÃO: Processos Fora do Prazo na Procuradoria",

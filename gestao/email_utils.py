@@ -2,6 +2,7 @@
 Utilitários para envio de e-mails HTML com templates
 """
 import os
+from urllib.parse import urljoin
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
@@ -10,69 +11,36 @@ from datetime import datetime, timedelta
 
 
 def enviar_email_html(assunto, template_name, contexto, destinatarios, anexos=None, logo_path=None):
-    """
-    Envia um e-mail HTML usando um template Django
-    
-    Args:
-        assunto (str): Assunto do e-mail
-        template_name (str): Nome do template (ex: 'emails/lembrete_procurador.html')
-        contexto (dict): Dicionário com variáveis para o template
-        destinatarios (list): Lista de e-mails destinatários
-        anexos (list): Lista de caminhos de arquivos para anexar (opcional)
-        logo_path (str): Caminho para o arquivo de logo (opcional)
-    
-    Returns:
-        bool: True se enviado com sucesso, False caso contrário
-    """
     try:
-        # Adiciona o ano atual ao contexto
         contexto['ano_atual'] = datetime.now().year
-        
-        # Renderiza o template HTML
         html_content = render_to_string(template_name, contexto)
-        
-        # Cria uma versão texto puro (fallback)
         text_content = strip_tags(html_content)
         
-        # Cria o e-mail
         email = EmailMultiAlternatives(
             subject=assunto,
             body=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=destinatarios
         )
-        
-        # Adiciona a versão HTML
         email.attach_alternative(html_content, "text/html")
-        
-        # Adiciona a logo como imagem inline
-        if logo_path is None:
-            logo_path = os.path.join(settings.BASE_DIR, 'gestao', 'static', 'gestao', 'imagens', 'logo.png')
-        
-        if os.path.exists(logo_path):
-            with open(logo_path, 'rb') as logo_file:
-                email.attach('logo.png', logo_file.read(), 'image/png')
-                # Define o Content-ID para referência no HTML
-                email.mixed_subtype = 'related'
-                for attachment in email.attachments:
-                    if attachment[0] == 'logo.png':
-                        attachment_data = attachment
-                        email.attachments.remove(attachment)
-                        from email.mime.image import MIMEImage
-                        img = MIMEImage(attachment_data[1])
-                        img.add_header('Content-ID', '<logo>')
-                        img.add_header('Content-Disposition', 'inline', filename='logo.png')
-                        if not hasattr(email, 'attach'):
-                            email.attach = lambda x: email.attachments.append(x)
-                        # Anexa inline
-        
-        # Adiciona anexos de documentos
+        email.mixed_subtype = 'related'
+
+        # 2. Tratamento de Anexos (Compatível com Cloud Storage e Local)
         if anexos:
-            for anexo_path in anexos:
-                if os.path.exists(anexo_path):
-                    email.attach_file(anexo_path)
-        
-        # Envia o e-mail
+            for anexo in anexos:
+                # Se for um objeto de arquivo do Django (FieldFile/File)
+                if hasattr(anexo, 'open'):
+                    with anexo.open('rb') as f:
+                        # Pega o nome do arquivo e o conteúdo binário
+                        email.attach(os.path.basename(anexo.name), f.read())
+                
+                # Se for um caminho string (tentativa de arquivo local)
+                elif isinstance(anexo, str) and os.path.exists(anexo):
+                    email.attach_file(anexo)
+                
+                else:
+                    print(f"Aviso: Anexo {anexo} não pôde ser processado.")
+
         email.send()
         return True
         
@@ -99,3 +67,14 @@ def verificar_prazo_proximo(data_limite, dias=3):
     data_alerta = hoje + timedelta(days=dias)
     
     return hoje <= data_limite <= data_alerta
+
+
+def build_absolute_system_url(path, request=None):
+    """Retorna uma URL absoluta para o domínio configurado."""
+    base_url = getattr(settings, 'SITE_BASE_URL', '').strip()
+    if base_url:
+        normalized_base = base_url if base_url.endswith('/') else f"{base_url}/"
+        return urljoin(normalized_base, path.lstrip('/'))
+    if request is not None:
+        return request.build_absolute_uri(path)
+    return path

@@ -1,86 +1,745 @@
 {% extends 'gestao/base.html' %}
 
 {% block content %}
+<style>
+    .monitoramento-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .monitoramento-header h1 {
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 0.25rem;
+    }
+
+    .filters-panel {
+        background: #ffffff;
+        border: 1px solid #e5e8eb;
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 10px 25px rgba(4, 53, 123, 0.05);
+        transition: padding-bottom 0.2s ease;
+    }
+
+    .filters-panel.is-collapsed {
+        padding-bottom: 0.9rem;
+    }
+
+    .filters-panel__toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        background: transparent;
+        border: none;
+        padding: 0;
+        color: inherit;
+        text-align: left;
+    }
+
+    .filters-panel__toggle:focus-visible {
+        outline: 2px solid #04357b;
+        border-radius: 8px;
+    }
+
+    .filters-panel__title {
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #6c757d;
+        margin-bottom: 0.15rem;
+    }
+
+    .filters-panel__subtitle {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #0f172a;
+    }
+
+    .filters-panel__badge {
+        border: 1px solid #e5e8eb;
+        border-radius: 999px;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-weight: 600;
+        color: #04357b;
+        background: #f8f9fe;
+        white-space: nowrap;
+    }
+
+    .filters-panel__body {
+        margin-top: 1.25rem;
+    }
+
+    .filters-panel.is-collapsed .filters-panel__body {
+        display: none;
+    }
+
+    .filters-panel__toggle-icon {
+        transition: transform 0.2s ease;
+    }
+
+    .filters-panel.is-collapsed .filters-panel__toggle-icon {
+        transform: rotate(-90deg);
+    }
+
+    .filters-panel .form-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: #6c757d;
+        letter-spacing: 0.05em;
+    }
+
+    .filters-panel .form-select,
+    .filters-panel .form-control {
+        border-radius: 8px;
+    }
+
+    .filters-panel__actions {
+        display: flex;
+        gap: 0.75rem;
+        width: 100%;
+    }
+
+    @media (min-width: 768px) {
+        .filters-panel__actions {
+            justify-content: flex-end;
+        }
+    }
+
+    .status-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+    }
+
+    .legend-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.85rem;
+        border-radius: 999px;
+        padding: 0.35rem 0.75rem;
+        background: #f8f9fa;
+        border: 1px dashed #d9dee3;
+        color: #495057;
+    }
+
+    .modern-table thead th {
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+
+    .modern-table tbody td {
+        vertical-align: middle;
+    }
+
+    .deadline-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.75rem;
+        background: linear-gradient(120deg, #fdecef, #f8f9fa);
+        color: #b02a37;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.35rem 0.9rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .status-pill::before {
+        content: '';
+        width: 0.45rem;
+        height: 0.45rem;
+        border-radius: 50%;
+        background: currentColor;
+    }
+
+    .status-pill--success {
+        background: #d1f2e9;
+        color: #0f5132;
+    }
+
+    .status-pill--danger {
+        background: #f8d7da;
+        color: #842029;
+    }
+
+    .status-pill--info {
+        background: #cff4fc;
+        color: #055160;
+    }
+
+    .priority-chip {
+        border-radius: 6px;
+        padding: 0.2rem 0.6rem;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .priority-chip--critical {
+        background: #fff1f0;
+        color: #a40011;
+        border: 1px solid #ffccd5;
+    }
+
+    .priority-chip--high {
+        background: #fff4d7;
+        color: #8a5200;
+        border: 1px solid #ffe0a3;
+    }
+
+    .priority-chip--regular {
+        background: #e9f5ff;
+        color: #0b5394;
+        border: 1px solid #b6e0ff;
+    }
+
+    .procurador-info {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-weight: 500;
+    }
+
+    .doc-badge {
+        background: #e9f2ff;
+        border: 1px solid #bdd7ff;
+        color: #04357b;
+        border-radius: 999px;
+        padding: 0.2rem 0.65rem;
+        font-size: 0.75rem;
+    }
+
+    .doc-badge--muted {
+        background: #f1f3f5;
+        border-color: #e1e4e8;
+        color: #6c757d;
+    }
+
+    .action-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 1px solid #d0d7de;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #04357b;
+        transition: all 0.2s ease;
+    }
+
+    .action-icon:hover {
+        background: #04357b;
+        color: #fff;
+    }
+
+    .doc-card-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1.25rem;
+    }
+
+    .doc-card {
+        border: 1px solid #e5e8eb;
+        border-left: 4px solid #04357b;
+        border-radius: 12px;
+        background: #fff;
+        padding: 1rem 1.125rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .doc-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6c757d;
+        margin-bottom: 0.2rem;
+    }
+
+    .doc-value {
+        font-weight: 600;
+        color: #212529;
+    }
+
+    .doc-info-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        border-bottom: 1px dashed #f0f0f0;
+        padding-bottom: 0.45rem;
+    }
+
+    .doc-info-row:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .doc-card-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+
+    @media (min-width: 480px) {
+        .doc-card-actions {
+            flex-direction: row;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .monitoramento-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .doc-info-row {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+
+    .pagination-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #f1f3f5;
+        background: #ffffff;
+    }
+
+    @media (min-width: 768px) {
+        .pagination-container {
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+        }
+    }
+</style>
+
+
+<div>
     <h1>Monitoramento de Análises</h1>
-    <p class="text-muted">Lista de todos os documentos distribuídos que ainda não foram finalizados.</p>
+    <p class="text-muted mb-0">Lista de todos os documentos distribuídos que ainda não foram finalizados.</p>
     <hr>
+</div>
 
-    <table class="table table-striped table-hover table-sm align-middle">
-        <thead>
-            <tr class="table-dark">
-                <th class="text-center">Prazo Limite</th>
-                <th class="text-center">N° Documento</th> 
-                <th class="text-center">Protocolo</th>
-                <th class="text-center">Status</th>
-                <th class="text-center">Tipo de Documento</th>
-                <th class="text-center">Prioridade</th> 
-                <th class="text-center">Procurador</th> 
-                <th class="text-center">Interessados</th>
-                <th class="text-center">Ações</th> 
-            </tr>
-        </thead>
-        <tbody>
-            {% for doc in documentos %}
-            <tr>
-                <td class="text-center text-danger fw-bold">{{ doc.data_limite|date:"d/m/Y"|default:"-" }}</td>
-                <td class="text-center">{{ doc.num_doc_origem }}</td>
-                <td class="text-center">{{ doc.protocolo }}</td>
-                
-                <td class="text-center">
-                    {% if doc.status == 'Análise Concluída' %}
-                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">
-                            {{ doc.status }}
-                        </span>
-                    {% elif doc.status == 'Rejeitado' %}
-                        <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis">
-                            {{ doc.status }}
-                        </span>
-                    {% else %}
-                        <span class="badge rounded-pill bg-info-subtle text-info-emphasis">
-                            {{ doc.status }}
-                        </span>
-                    {% endif %}
-                </td>
-                
-                <td class="text-center">{{ doc.tipo_documento }}</td>
-                <td class="text-center">{{ doc.prioridade }}</td>
-                <td class="text-start">{{ doc.procurador_atribuido.get_full_name|default:doc.procurador_atribuido.username }}</td>
-                <td class="text-start">
-                    <div class="d-flex flex-wrap gap-1">
-                        {% for interessado in doc.interessados.all %}
-                            <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle px-2 py-1" 
-                                style="font-size: 0.75rem;" 
-                                title="{{ interessado.nome_razao_social }}">
-                                <i class="fas fa-university me-1"></i>{{ interessado.nome_razao_social|truncatechars:25 }}
+{% with filters_count|default:0 as active_filters %}
+<div class="filters-panel {% if not active_filters %}is-collapsed{% endif %}" data-filter-panel data-start-open="{% if active_filters %}true{% else %}false{% endif %}">
+    <button type="button" class="filters-panel__toggle" aria-expanded="{% if active_filters %}true{% else %}false{% endif %}">
+        <div>
+            <span class="filters-panel__title">Filtros</span>
+            <span class="filters-panel__subtitle" data-filter-toggle-text>
+                {% if active_filters %}Ocultar filtros{% else %}Mostrar filtros{% endif %}
+            </span>
+        </div>
+        <span class="filters-panel__badge">
+            <i class="fa-solid fa-sliders"></i>
+            {% if active_filters %}
+                {{ active_filters }} ativo(s)
+            {% else %}
+                Inativo
+            {% endif %}
+            <i class="fa-solid fa-chevron-down filters-panel__toggle-icon"></i>
+        </span>
+    </button>
+
+    <div class="filters-panel__body">
+        <form method="get">
+            <div class="row g-3 align-items-end">
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Status</label>
+                <select class="form-select" name="status">
+                    <option value="">Todos</option>
+                    {% for status_option in status_options %}
+                        <option value="{{ status_option }}" {% if selected_filters.status == status_option %}selected{% endif %}>{{ status_option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Prioridade</label>
+                <select class="form-select" name="prioridade">
+                    <option value="">Todas</option>
+                    {% for prioridade in prioridades %}
+                        <option value="{{ prioridade.id }}" {% if selected_filters.prioridade == prioridade.id|stringformat:"s" %}selected{% endif %}>{{ prioridade.descricao }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Procurador</label>
+                <select class="form-select" name="procurador">
+                    <option value="">Todos</option>
+                    {% for procurador in procuradores %}
+                        <option value="{{ procurador.id }}" {% if selected_filters.procurador == procurador.id|stringformat:"s" %}selected{% endif %}>
+                            {{ procurador.get_full_name|default:procurador.username }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Interessados</label>
+                <select class="form-select" name="interessado">
+                    <option value="">Todos</option>
+                    {% for interessado in interessados %}
+                        <option value="{{ interessado.id }}" {% if selected_filters.interessado == interessado.id|stringformat:"s" %}selected{% endif %}>{{ interessado.nome_razao_social }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <label class="form-label">Itens por página</label>
+                <select class="form-select" name="page_size">
+                    {% for option in page_size_options %}
+                        <option value="{{ option }}" {% if selected_filters.page_size == option|stringformat:"s" %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-9 col-lg-4 filters-panel__actions">
+                <button type="submit" class="btn btn-primary flex-grow-1">
+                    <i class="fa-solid fa-filter me-2"></i>Aplicar filtros
+                </button>
+                <a href="{% url 'gestao:monitoramento_analises' %}" class="btn btn-outline-secondary flex-grow-1">
+                    <i class="fa-solid fa-rotate-left me-2"></i>Limpar
+                </a>
+            </div>
+        </div>
+        </form>
+        {% if active_filters %}
+            <div class="mt-3 small text-muted">
+                <i class="fa-solid fa-circle-info me-1 text-primary"></i>{{ active_filters }} filtro(s) ativo(s)
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endwith %}
+
+{% if total_documentos %}
+<div class="card shadow-sm">
+    
+    <div class="card-body p-0">
+        <div class="table-responsive d-none d-lg-block">
+            <table class="table modern-table align-middle mb-0">
+                <thead>
+                    <tr class="table-dark">
+                        <th class="text-center">Prazo Limite</th>
+                        <th class="text-center">N° Documento</th>
+                        <th class="text-center">Protocolo</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center">Tipo de Documento</th>
+                        <th class="text-center">Prioridade</th>
+                        <th class="text-center">Procurador</th>
+                        <th class="text-center">Interessados</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in documentos %}
+                    <tr>
+                        <td class="text-center">
+                            <span class="deadline-chip">
+                                <i class="fa-regular fa-calendar-days"></i>
+                                {{ doc.data_limite|date:"d/m/Y"|default:"-" }}
                             </span>
-                        {% empty %}
-                            <span class="text-muted small italic">Nenhum interessado</span>
-                        {% endfor %}
-                    </div>
-                </td>
-                
-                <td class="text-center"> 
-                    <a href="{% url 'gestao:finalizacao_detail' pk=doc.pk %}" title="Acessar Processo" 
-                       class="text-decoration-none me-2" style="color: #04357b; font-size: 1.1em;">
-                       <i class="fas fa-eye"></i>
-                    </a> 
+                        </td>
+                        <td class="text-center">{{ doc.num_doc_origem|default:"-" }}</td>
+                        <td class="text-center">{{ doc.protocolo|default:"-" }}</td>
+                        <td class="text-center">
+                            {% if doc.status == 'Análise Concluída' %}
+                                <span class="status-pill status-pill--success">
+                                    <i class="fa-solid fa-circle-check"></i>{{ doc.status }}
+                                </span>
+                            {% elif doc.status == 'Rejeitado' %}
+                                <span class="status-pill status-pill--danger">
+                                    <i class="fa-solid fa-circle-xmark"></i>{{ doc.status }}
+                                </span>
+                            {% else %}
+                                <span class="status-pill status-pill--info">
+                                    <i class="fa-solid fa-hourglass-half"></i>{{ doc.status }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ doc.tipo_documento|default:"-" }}</td>
+                        <td class="text-center">
+                            {% with prioridade=doc.prioridade|default:"Sem prioridade" %}
+                                {% if prioridade|lower == 'urgente' %}
+                                    <span class="priority-chip priority-chip--critical">
+                                        <i class="fa-solid fa-bolt"></i>{{ prioridade }}
+                                    </span>
+                                {% elif prioridade|lower == 'alta' %}
+                                    <span class="priority-chip priority-chip--high">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>{{ prioridade }}
+                                    </span>
+                                {% else %}
+                                    <span class="priority-chip priority-chip--regular">
+                                        <i class="fa-solid fa-signal"></i>{{ prioridade }}
+                                    </span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="text-start">
+                            {% with procurador=doc.procurador_atribuido %}
+                                {% if procurador %}
+                                    <span class="procurador-info">
+                                        <i class="fa-solid fa-user-tie text-muted"></i>
+                                        {{ procurador.get_full_name|default:procurador.username }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted small fst-italic">Sem procurador atribuído</span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="text-start">
+                            {% with interessados=doc.interessados.all %}
+                                {% if interessados %}
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for interessado in interessados|slice:":3" %}
+                                            <span class="doc-badge" title="{{ interessado.nome_razao_social }}">
+                                                <i class="fas fa-university me-1"></i>{{ interessado.nome_razao_social|truncatechars:25 }}
+                                            </span>
+                                        {% endfor %}
+                                        {% if interessados|length > 3 %}
+                                            <span class="doc-badge doc-badge--muted">+{{ interessados|length|add:"-3" }}</span>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted small fst-italic">Nenhum interessado</span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex justify-content-center gap-2">
+                                <a href="{% url 'gestao:finalizacao_detail' pk=doc.pk %}" class="action-icon" title="Acessar processo">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if doc.status == 'Em Análise' and doc.procurador_atribuido %}
+                                    <a href="{% url 'gestao:enviar_lembrete' pk=doc.pk %}" class="action-icon" title="Enviar lembrete">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-                    {% if doc.status == 'Em Análise' and doc.procurador_atribuido %}
-                        <a href="{% url 'gestao:enviar_lembrete' pk=doc.pk %}" title="Enviar Lembrete" 
-                           class="text-decoration-none" style="color: #04357b; font-size: 1.1em;">
-                           <i class="fas fa-paper-plane"></i>
+        <div class="doc-card-stack d-lg-none">
+            {% for doc in documentos %}
+                <div class="doc-card shadow-sm">
+                    <div class="d-flex justify-content-between gap-3">
+                        <div>
+                            <p class="doc-label mb-1">Prazo limite</p>
+                            <span class="deadline-chip">
+                                <i class="fa-regular fa-calendar-days"></i>
+                                {{ doc.data_limite|date:"d/m/Y"|default:"-" }}
+                            </span>
+                        </div>
+                        <div class="text-end">
+                            {% if doc.status == 'Análise Concluída' %}
+                                <span class="status-pill status-pill--success mb-1">
+                                    <i class="fa-solid fa-circle-check"></i>{{ doc.status }}
+                                </span>
+                            {% elif doc.status == 'Rejeitado' %}
+                                <span class="status-pill status-pill--danger mb-1">
+                                    <i class="fa-solid fa-circle-xmark"></i>{{ doc.status }}
+                                </span>
+                            {% else %}
+                                <span class="status-pill status-pill--info mb-1">
+                                    <i class="fa-solid fa-hourglass-half"></i>{{ doc.status }}
+                                </span>
+                            {% endif %}
+                            {% with prioridade=doc.prioridade|default:"Sem prioridade" %}
+                                {% if prioridade|lower == 'urgente' %}
+                                    <span class="priority-chip priority-chip--critical">
+                                        <i class="fa-solid fa-bolt"></i>{{ prioridade }}
+                                    </span>
+                                {% elif prioridade|lower == 'alta' %}
+                                    <span class="priority-chip priority-chip--high">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>{{ prioridade }}
+                                    </span>
+                                {% else %}
+                                    <span class="priority-chip priority-chip--regular">
+                                        <i class="fa-solid fa-signal"></i>{{ prioridade }}
+                                    </span>
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+                    </div>
+
+                    <div class="doc-info-row">
+                        <span class="doc-label mb-0">N° Documento</span>
+                        <span class="doc-value">{{ doc.num_doc_origem|default:"-" }}</span>
+                    </div>
+                    <div class="doc-info-row">
+                        <span class="doc-label mb-0">Protocolo</span>
+                        <span class="doc-value">{{ doc.protocolo|default:"-" }}</span>
+                    </div>
+                    <div class="doc-info-row">
+                        <span class="doc-label mb-0">Tipo de Documento</span>
+                        <span class="doc-value">{{ doc.tipo_documento|default:"-" }}</span>
+                    </div>
+                    <div class="doc-info-row">
+                        <span class="doc-label mb-0">Procurador</span>
+                        {% with procurador=doc.procurador_atribuido %}
+                            {% if procurador %}
+                                <span class="doc-value">
+                                    <i class="fa-solid fa-user-tie text-muted me-1"></i>
+                                    {{ procurador.get_full_name|default:procurador.username }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted small fst-italic">Sem procurador atribuído</span>
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                    <div class="doc-info-row">
+                        <span class="doc-label mb-0">Interessados</span>
+                        <div>
+                            {% with interessados=doc.interessados.all %}
+                                {% if interessados %}
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for interessado in interessados|slice:":3" %}
+                                            <span class="doc-badge" title="{{ interessado.nome_razao_social }}">
+                                                <i class="fas fa-university me-1"></i>{{ interessado.nome_razao_social|truncatechars:25 }}
+                                            </span>
+                                        {% endfor %}
+                                        {% if interessados|length > 3 %}
+                                            <span class="doc-badge doc-badge--muted">+{{ interessados|length|add:"-3" }}</span>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted small fst-italic">Nenhum interessado</span>
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+                    </div>
+
+                    <div class="doc-card-actions">
+                        <a href="{% url 'gestao:finalizacao_detail' pk=doc.pk %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-eye me-1"></i> Ver processo
                         </a>
-                    {% endif %}
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="9" class="text-center p-3">
-                    Nenhum documento em análise ou aguardando finalização no momento.
-                </td>
-            </tr>
+                        {% if doc.status == 'Em Análise' and doc.procurador_atribuido %}
+                            <a href="{% url 'gestao:enviar_lembrete' pk=doc.pk %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-paper-plane me-1"></i> Enviar lembrete
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
             {% endfor %}
-        </tbody>
-    </table>
+        </div>
+
+        <div class="pagination-container">
+            <p class="text-muted small mb-0">
+                Mostrando {{ documentos.start_index }} - {{ documentos.end_index }} de {{ total_documentos }} documento(s)
+            </p>
+            {% if is_paginated %}
+                <nav aria-label="Paginação de documentos">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item {% if not documentos.has_previous %}disabled{% endif %}">
+                            {% if documentos.has_previous %}
+                                <a class="page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ documentos.previous_page_number }}" aria-label="Página anterior">&laquo;</a>
+                            {% else %}
+                                <span class="page-link">&laquo;</span>
+                            {% endif %}
+                        </li>
+                        {% for item in page_window %}
+                            {% if item == '...' %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                            {% else %}
+                                <li class="page-item {% if documentos.number == item %}active{% endif %}">
+                                    <a class="page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ item }}">{{ item }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        <li class="page-item {% if not documentos.has_next %}disabled{% endif %}">
+                            {% if documentos.has_next %}
+                                <a class="page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ documentos.next_page_number }}" aria-label="Próxima página">&raquo;</a>
+                            {% else %}
+                                <span class="page-link">&raquo;</span>
+                            {% endif %}
+                        </li>
+                    </ul>
+                </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% else %}
+    <div class="alert alert-light border text-center py-4 shadow-sm">
+        Nenhum documento em análise ou aguardando finalização no momento.
+    </div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const panel = document.querySelector('[data-filter-panel]');
+    if (!panel) {
+        return;
+    }
+
+    const toggleBtn = panel.querySelector('.filters-panel__toggle');
+    const toggleText = panel.querySelector('[data-filter-toggle-text]');
+    const storageKey = 'monitoramentoFiltersOpen';
+    const startOpen = panel.dataset.startOpen === 'true';
+    let persistedState = null;
+
+    try {
+        persistedState = localStorage.getItem(storageKey);
+    } catch (err) {
+        persistedState = null;
+    }
+
+    let isOpen = persistedState !== null ? persistedState === 'true' : startOpen;
+
+    const syncState = () => {
+        panel.classList.toggle('is-collapsed', !isOpen);
+        if (toggleBtn) {
+            toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        }
+        if (toggleText) {
+            toggleText.textContent = isOpen ? 'Ocultar filtros' : 'Mostrar filtros';
+        }
+    };
+
+    syncState();
+
+    toggleBtn?.addEventListener('click', () => {
+        isOpen = !isOpen;
+        try {
+            localStorage.setItem(storageKey, isOpen ? 'true' : 'false');
+        } catch (err) {
+            // Ignore storage errors (private mode, etc.).
+        }
+        syncState();
+    });
+});
+</script>
 
 {% endblock %}

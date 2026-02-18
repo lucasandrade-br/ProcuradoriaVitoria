@@ -57,7 +57,7 @@ class Documento(models.Model):
         ('Em Análise', 'Em Análise'),
         ('Análise Concluída', 'Análise Concluída'),
         ('Aguardando Confirmação', 'Aguardando Confirmação'), 
-        ('Devolvido pela Análise', 'Devolvido pela Análise'), # Movido para baixo por lógica
+        ('Devolvido pela Análise', 'Devolvido pela Análise'),
         ('Finalizado', 'Finalizado'),
     ]
 
